@@ -1,0 +1,6 @@
+module Avro.Schema
+  (
+  )
+where
+
+
