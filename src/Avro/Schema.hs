@@ -18,13 +18,13 @@ import qualified Data.Attoparsec.ByteString.Lazy as APS
 import Data.Bool (bool)
 import Data.Int (Int32, Int64)
 
-import Data.Monoid (mempty, mappend)
+import Data.Monoid (mappend)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BS.Lazy
 import Data.ByteString.Builder (Builder, word8, byteString)
 
+import ZigZagCoding (zigZagEncode, zigZagDecode)
 
 
 class Schema t
