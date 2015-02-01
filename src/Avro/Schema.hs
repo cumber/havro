@@ -1,4 +1,6 @@
-{-# LANGUAGE TupleSections
+{-# LANGUAGE FlexibleInstances
+           , OverloadedStrings
+           , TupleSections
            , TypeSynonymInstances
   #-}
 
@@ -7,7 +9,14 @@ module Avro.Schema
   )
 where
 
+import Control.Applicative ((<$>))
+
+import Data.Attoparsec.ByteString.Lazy (Parser, anyWord8)
+
 import Data.Bool (bool)
+
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BS
 
 
 class Schema t
@@ -15,17 +24,13 @@ class Schema t
         avroBool :: t Bool
 
 
-newtype Decoder t = Decoder { decode :: String -> (String, t) }
+instance Schema Parser
+  where avroNull = return ()
 
-instance Schema Decoder
-  where avroNull = Decoder (, ())
-
-        avroBool = Decoder f
-          where f ('\NUL':cs) = (cs, False)
-                f (_:cs) = (cs, True)
+        avroBool = (/= 0) <$> anyWord8
 
 
-newtype Encoder t = Encoder { encode :: t -> String }
+newtype Encoder t = Encoder { encode :: t -> ByteString }
 
 instance Schema Encoder
   where avroNull = Encoder (const "")
