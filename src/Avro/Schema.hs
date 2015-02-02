@@ -16,9 +16,11 @@ import Data.Attoparsec.ByteString.Lazy (Parser, anyWord8)
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
 import Data.Bool (bool)
+import Data.Bits ((.&.), FiniteBits, setBit, shiftR)
 import Data.Int (Int32, Int64)
+import Data.Word (Word32, Word64)
 
-import Data.Monoid (mappend)
+import Data.Monoid ((<>), mappend)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -48,8 +50,23 @@ newtype Encoder t = Encoder { encode :: t -> Builder }
 instance Schema Encoder
   where avroNull = Encoder $ const ""
         avroBool = Encoder $ bool "\0" "\1"
-        avroInt = Encoder $ word8 . fromIntegral
-        avroLong = Encoder $ word8 . fromIntegral
+        avroInt = Encoder $ encodeVarWord . zigZagEncode
+        avroLong = Encoder $ encodeVarWord . zigZagEncode
         avroString
           = Encoder $   uncurry mappend
                       . (encode avroLong . fromIntegral . BS.length &&& byteString)
+
+
+
+class (FiniteBits a, Integral a) => VarWord a
+  where encodeVarWord :: a -> Builder
+        encodeVarWord x
+          = let low7 = fromIntegral $ x .&. 127
+                rest = x `shiftR` 7
+            in  if rest == 0 then
+                    word8 low7
+                else
+                    word8 (setBit low7 8) <> encodeVarWord rest
+
+instance VarWord Word32
+instance VarWord Word64
