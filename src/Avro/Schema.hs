@@ -16,9 +16,9 @@ import Data.Attoparsec.ByteString.Lazy (Parser, anyWord8)
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
 import Data.Bool (bool)
-import Data.Bits ((.&.), FiniteBits, setBit, shiftR)
+import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
-import Data.Word (Word32, Word64)
+import Data.Word (Word, Word8, Word16, Word32, Word64)
 
 import Data.Monoid ((<>), mappend)
 
@@ -40,8 +40,8 @@ class Schema t
 instance Schema Parser
   where avroNull = return ()
         avroBool = (/= 0) <$> anyWord8
-        avroInt = fromIntegral <$> anyWord8
-        avroLong = fromIntegral <$> anyWord8
+        avroInt = zigZagDecode . decodeVarWord <$> getVarWordBytes
+        avroLong = zigZagDecode . decodeVarWord <$> getVarWordBytes
         avroString = APS.take . fromIntegral =<< avroLong
 
 
@@ -54,19 +54,32 @@ instance Schema Encoder
         avroLong = Encoder $ encodeVarWord . zigZagEncode
         avroString
           = Encoder $   uncurry mappend
-                      . (encode avroLong . fromIntegral . BS.length &&& byteString)
+                      . (   encode avroLong . fromIntegral . BS.length
+                        &&& byteString
+                        )
 
 
 
 class (FiniteBits a, Integral a) => VarWord a
   where encodeVarWord :: a -> Builder
         encodeVarWord x
-          = let low7 = fromIntegral $ x .&. 127
+          = let low7 = fromIntegral $ x .&. 0x7f
                 rest = x `shiftR` 7
-            in  if rest == 0 then
-                    word8 low7
-                else
-                    word8 (setBit low7 8) <> encodeVarWord rest
+            in  if rest == 0
+                  then  word8 low7
+                  else  word8 (setBit low7 7) <> encodeVarWord rest
 
+        decodeVarWord :: ByteString -> a
+        decodeVarWord = BS.foldl' f 0
+          where f x b = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
+
+
+instance VarWord Word
+instance VarWord Word8
+instance VarWord Word16
 instance VarWord Word32
 instance VarWord Word64
+
+
+getVarWordBytes :: Parser ByteString
+getVarWordBytes = APS.scan True $ \s b -> bool (Just $ testBit b 7) Nothing s
