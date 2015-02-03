@@ -5,7 +5,15 @@
   #-}
 
 module Avro.Schema
-  (
+  ( Schema
+  , avroNull
+  , avroBool
+  , avroInt
+  , avroLong
+  , avroString
+
+  , Encoder
+  , encode
   )
 where
 
@@ -70,8 +78,8 @@ class (FiniteBits a, Integral a) => VarWord a
                   else  word8 (setBit low7 7) <> encodeVarWord rest
 
         decodeVarWord :: ByteString -> a
-        decodeVarWord = BS.foldl' f 0
-          where f x b = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
+        decodeVarWord = BS.foldr' f 0
+          where f b x = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
 
 
 instance VarWord Word
@@ -82,4 +90,8 @@ instance VarWord Word64
 
 
 getVarWordBytes :: Parser ByteString
-getVarWordBytes = APS.scan True $ \s b -> bool (Just $ testBit b 7) Nothing s
+getVarWordBytes
+  = APS.scan True
+      $ \s b -> if s
+                  then  Just $ testBit b 7
+                  else  Nothing
