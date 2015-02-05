@@ -6,6 +6,7 @@
   #-}
 
 import Control.Applicative ((<$>))
+import Control.Monad (replicateM)
 
 import Data.Bool (bool)
 import Data.Int (Int8, Int32, Int64)
@@ -19,7 +20,7 @@ import GHC.Exts (fromString)
 import Test.SmallCheck.Series ((\/), Series, generate)
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.SmallCheck ((==>), over, testProperty)
+import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
@@ -74,13 +75,13 @@ avroPrimitiveTests = testGroup "Avro primitives"
   , testProperty "Bool: decode . encode == id" (roundTrip avroBool)
 
   , testProperty "Int: decode . encode == id"
-      ( roundTrip avroInt . (fromIntegral :: Int -> Int32) )
+      ( changeDepth (*200) $ roundTrip avroInt . (fromIntegral :: Int -> Int32) )
 
   , testProperty "Long: decode . encode == id"
-      ( roundTrip avroLong . (fromIntegral :: Int -> Int64) )
+      ( changeDepth (*200) $ roundTrip avroLong . (fromIntegral :: Int -> Int64) )
 
   , testProperty "String: decode . encode == id"
-      ( roundTrip avroString . fromString )
+      ( over longerStrings $ roundTrip avroString . fromString )
   ]
 
 
@@ -107,3 +108,8 @@ int8s = special \/ positive \/ negative
 
         toInt8 :: Int -> Int8
         toInt8 d = fromIntegral $ min d (fromIntegral (maxBound :: Int8))
+
+
+longerStrings :: Monad m => Series m String
+longerStrings = generate $ flip replicateM "\0a"
+
