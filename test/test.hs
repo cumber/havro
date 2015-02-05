@@ -7,6 +7,7 @@
 
 import Control.Applicative ((<$>))
 import Control.Monad (replicateM)
+import Control.Monad.Logic (interleave)
 
 import Data.Bool (bool)
 import Data.Int (Int8, Int32, Int64)
@@ -75,10 +76,10 @@ avroPrimitiveTests = testGroup "Avro primitives"
   , testProperty "Bool: decode . encode == id" (roundTrip avroBool)
 
   , testProperty "Int: decode . encode == id"
-      ( changeDepth (*200) $ roundTrip avroInt . (fromIntegral :: Int -> Int32) )
+      ( changeDepth (*200) . over largeAndSmall $ roundTrip avroInt . (fromIntegral :: Int -> Int32) )
 
   , testProperty "Long: decode . encode == id"
-      ( changeDepth (*200) $ roundTrip avroLong . (fromIntegral :: Int -> Int64) )
+      ( changeDepth (*200) . over largeAndSmall $ roundTrip avroLong . (fromIntegral :: Int -> Int64) )
 
   , testProperty "String: decode . encode == id"
       ( over longerStrings $ roundTrip avroString . fromString )
@@ -113,3 +114,14 @@ int8s = special \/ positive \/ negative
 longerStrings :: Monad m => Series m String
 longerStrings = generate $ flip replicateM "\0a"
 
+
+largeAndSmall :: (Bounded a, Integral a, Monad m) => Series m a
+largeAndSmall
+  = generate $ flip take xs
+  where l = minBound `div` 2
+        h = maxBound `div` 2
+        mn = minBound
+        mx = maxBound
+        xs = interleave
+                (interleave [mn, mn + 1 .. l] [mx, mx - 1 .. h])
+                (interleave [0, -1 .. l + 1] [1 .. h - 1])
