@@ -26,7 +26,6 @@ import qualified Data.Attoparsec.ByteString.Lazy as APS
 import Data.Bool (bool)
 import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
-import Data.Word (Word, Word8, Word16, Word32, Word64)
 
 import Data.Monoid ((<>), mappend)
 
@@ -68,25 +67,17 @@ instance Schema Encoder
 
 
 
-class (FiniteBits a, Integral a) => VarWord a
-  where encodeVarWord :: a -> Builder
-        encodeVarWord x
-          = let low7 = fromIntegral $ x .&. 0x7f
-                rest = x `shiftR` 7
-            in  if rest == 0
-                  then  word8 low7
-                  else  word8 (setBit low7 7) <> encodeVarWord rest
+encodeVarWord :: (FiniteBits a, Integral a) => a -> Builder
+encodeVarWord x
+  = let low7 = fromIntegral $ x .&. 0x7f
+        rest = x `shiftR` 7
+    in  if rest == 0
+          then  word8 low7
+          else  word8 (setBit low7 7) <> encodeVarWord rest
 
-        decodeVarWord :: ByteString -> a
-        decodeVarWord = BS.foldr' f 0
-          where f b x = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
-
-
-instance VarWord Word
-instance VarWord Word8
-instance VarWord Word16
-instance VarWord Word32
-instance VarWord Word64
+decodeVarWord :: (FiniteBits a, Integral a) => ByteString -> a
+decodeVarWord = BS.foldr' f 0
+  where f b x = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
 
 
 getVarWordBytes :: Parser ByteString
