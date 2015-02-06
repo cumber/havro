@@ -48,9 +48,9 @@ zigZagTests = testGroup "Zig zag coding"
 
   , testProperty "encode (x + signum x) == (encode x) + 2"
       ( over allInt8s
-          $ \x ->   not (x `elem` [0, minBound, maxBound])
+          $ \x ->   x `notElem` [0, minBound, maxBound]
                     ==> zigZagEncode (x + signum x)
-                        == (zigZagEncode (x :: Int8)) + 2
+                        == zigZagEncode (x :: Int8) + 2
       )
 
   , testProperty "abs x < abs y => encode x < encode y"
@@ -87,7 +87,7 @@ avroPrimitiveTests = testGroup "Avro primitives"
 
 
 roundTrip :: Eq a => (forall s. Schema s => s a) -> a -> Bool
-roundTrip s = \x -> parses x s . toLazyByteString . encode s $ x
+roundTrip s x = parses x s . toLazyByteString . encode s $ x
 
 
 parses :: Eq a => a -> Parser a -> ByteString -> Bool
