@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances
+           , KindSignatures
            , OverloadedStrings
            , TupleSections
            , TypeSynonymInstances
@@ -6,21 +7,20 @@
 
 module Avro.Schema
   ( Schema
-  , avroNull
-  , avroBool
-  , avroInt
-  , avroLong
-  , avroString
+      ( avroNull
+      , avroBool
+      , avroInt
+      , avroLong
+      , avroString
+      )
 
-  , Encoder
-  , encode
+  , Encoder (Encoder, encode)
   )
 where
 
 import Control.Applicative ((<$>))
 import Control.Arrow ((&&&))
 
-import Data.Attoparsec.ByteString.Lazy (Parser, anyWord8)
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
 import Data.Bool (bool)
@@ -36,7 +36,12 @@ import Data.ByteString.Builder (Builder, word8, byteString)
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
 
-class Schema t
+{-| Class of type constructors that can be used to interpret Avro schemas.
+
+    Given a @schema :: 'Schema' t => t a@, @a@ is a Haskell type corresponding
+    to the Avro type described by @schema@.
+-}
+class Schema (t :: * -> *)
   where avroNull :: t ()
         avroBool :: t Bool
         avroInt :: t Int32
@@ -44,16 +49,20 @@ class Schema t
         avroString :: t ByteString
 
 
-instance Schema Parser
+-- |    Attoparsec parsers can parse according to an Avro schema.
+instance Schema APS.Parser
   where avroNull = return ()
-        avroBool = (/= 0) <$> anyWord8
+        avroBool = (/= 0) <$> APS.anyWord8
         avroInt = zigZagDecode . decodeVarWord <$> getVarWordBytes
         avroLong = zigZagDecode . decodeVarWord <$> getVarWordBytes
         avroString = APS.take . fromIntegral =<< avroLong
 
 
+-- |    Basically (-> Builder) if we had type-level operator sections.
 newtype Encoder t = Encoder { encode :: t -> Builder }
 
+
+-- |    An 'Encoder' serialises Haskell values according to an Avro schema.
 instance Schema Encoder
   where avroNull = Encoder $ const ""
         avroBool = Encoder $ bool "\0" "\1"
@@ -80,7 +89,7 @@ decodeVarWord = BS.foldr' f 0
   where f b x = x `shiftL` 7 + fromIntegral (b .&. 0x7f)
 
 
-getVarWordBytes :: Parser ByteString
+getVarWordBytes :: APS.Parser ByteString
 getVarWordBytes
   = APS.scan True
       $ \s b -> if s
