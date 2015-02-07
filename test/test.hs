@@ -5,11 +5,9 @@
            , RankNTypes
   #-}
 
-import Control.Applicative ((<$>))
 import Control.Monad (replicateM)
 import Control.Monad.Logic (interleave)
 
-import Data.Bool (bool)
 import Data.Int (Int8, Int32, Int64)
 
 import Data.Attoparsec.ByteString.Lazy (Parser, Result(Done, Fail), parse)
@@ -18,14 +16,25 @@ import Data.ByteString.Lazy (ByteString)
 
 import GHC.Exts (fromString)
 
-import Test.SmallCheck.Series ((\/), Series, generate)
+import Test.SmallCheck.Series (Series, generate)
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
-import Avro.Schema (Schema, avroNull, avroBool, avroInt, avroLong, avroString, encode)
+import Avro.Schema
+  ( Schema
+      ( avroNull
+      , avroBool
+      , avroInt
+      , avroLong
+      , avroFloat
+      , avroDouble
+      , avroString
+      )
+  , encode
+  )
 
 
 main :: IO ()
@@ -76,10 +85,18 @@ avroPrimitiveTests = testGroup "Avro primitives"
   , testProperty "Bool: decode . encode == id" (roundTrip avroBool)
 
   , testProperty "Int: decode . encode == id"
-      ( changeDepth (*200) . over largeAndSmall $ roundTrip avroInt . (fromIntegral :: Int -> Int32) )
+      ( changeDepth (*200) . over largeAndSmall
+          $ roundTrip avroInt . (fromIntegral :: Int -> Int32)
+      )
 
   , testProperty "Long: decode . encode == id"
-      ( changeDepth (*200) . over largeAndSmall $ roundTrip avroLong . (fromIntegral :: Int -> Int64) )
+      ( changeDepth (*200) . over largeAndSmall
+          $ roundTrip avroLong . (fromIntegral :: Int -> Int64)
+      )
+
+  , testProperty "Float: decode . encode == id" (roundTrip avroFloat)
+
+  , testProperty "Double: decode . encode == id" (roundTrip avroDouble)
 
   , testProperty "String: decode . encode == id"
       ( over longerStrings $ roundTrip avroString . fromString )
@@ -100,15 +117,6 @@ parses x parser
 -- Generator ignores depth and just fully explores Int8
 allInt8s :: Monad m => Series m Int8
 allInt8s = generate $ const [minBound..maxBound]
-
-int8s :: Monad m => Series m Int8
-int8s = special \/ positive \/ negative
-  where special = generate $ \d -> bool [0, minBound] [] $ d >= 0
-        positive = generate $ \d -> [1 .. toInt8 d]
-        negative = negate <$> positive
-
-        toInt8 :: Int -> Int8
-        toInt8 d = fromIntegral $ min d (fromIntegral (maxBound :: Int8))
 
 
 longerStrings :: Monad m => Series m String

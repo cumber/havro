@@ -10,6 +10,8 @@ module Avro.Schema
       ( avroNull
       , avroBool
       , avroInt
+      , avroFloat
+      , avroDouble
       , avroLong
       , avroString
       )
@@ -31,7 +33,11 @@ import Data.Monoid ((<>), mappend)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.ByteString.Builder (Builder, word8, byteString)
+import qualified Data.ByteString.Lazy as LBS
+import Data.ByteString.Builder (Builder, byteString, doubleLE, floatLE, word8)
+
+import Data.Binary.Get (runGet)
+import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
@@ -46,6 +52,8 @@ class Schema (t :: * -> *)
         avroBool :: t Bool
         avroInt :: t Int32
         avroLong :: t Int64
+        avroFloat :: t Float
+        avroDouble :: t Double
         avroString :: t ByteString
 
 
@@ -55,6 +63,8 @@ instance Schema APS.Parser
         avroBool = (/= 0) <$> APS.anyWord8
         avroInt = zigZagDecode . decodeVarWord <$> getVarWordBytes
         avroLong = zigZagDecode . decodeVarWord <$> getVarWordBytes
+        avroFloat = runGet getFloat32le . LBS.fromStrict <$> APS.take 4
+        avroDouble = runGet getFloat64le . LBS.fromStrict <$> APS.take 8
         avroString = APS.take . fromIntegral =<< avroLong
 
 
@@ -68,6 +78,8 @@ instance Schema Encoder
         avroBool = Encoder $ bool "\0" "\1"
         avroInt = Encoder $ encodeVarWord . zigZagEncode
         avroLong = Encoder $ encodeVarWord . zigZagEncode
+        avroFloat = Encoder floatLE
+        avroDouble = Encoder doubleLE
         avroString
           = Encoder $   uncurry mappend
                       . (   encode avroLong . fromIntegral . BS.length
