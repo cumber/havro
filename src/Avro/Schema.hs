@@ -13,6 +13,7 @@ module Avro.Schema
       , avroFloat
       , avroDouble
       , avroLong
+      , avroBytes
       , avroString
       )
 
@@ -39,6 +40,11 @@ import Data.ByteString.Builder (Builder, byteString, doubleLE, floatLE, word8)
 import Data.Binary.Get (runGet)
 import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
+import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
+
+import Data.Text (Text)
+import Data.Text.Encoding (decodeUtf8', encodeUtf8)
+
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
 
@@ -54,7 +60,8 @@ class Schema (t :: * -> *)
         avroLong :: t Int64
         avroFloat :: t Float
         avroDouble :: t Double
-        avroString :: t ByteString
+        avroBytes :: t ByteString
+        avroString :: t Text
 
 
 -- |    Attoparsec parsers can parse according to an Avro schema.
@@ -65,11 +72,15 @@ instance Schema APS.Parser
         avroLong = zigZagDecode . decodeVarWord <$> getVarWordBytes
         avroFloat = runGet getFloat32le . LBS.fromStrict <$> APS.take 4
         avroDouble = runGet getFloat64le . LBS.fromStrict <$> APS.take 8
-        avroString = APS.take . fromIntegral =<< avroLong
+        avroBytes = APS.take . fromIntegral =<< avroLong
+        avroString = either (fail . show) return . decodeUtf8' =<< avroBytes
 
 
 -- |    Basically (-> Builder) if we had type-level operator sections.
 newtype Encoder t = Encoder { encode :: t -> Builder }
+
+instance Contravariant Encoder
+  where contramap f = Encoder . ( . f) . encode
 
 
 -- |    An 'Encoder' serialises Haskell values according to an Avro schema.
@@ -80,11 +91,12 @@ instance Schema Encoder
         avroLong = Encoder $ encodeVarWord . zigZagEncode
         avroFloat = Encoder floatLE
         avroDouble = Encoder doubleLE
-        avroString
+        avroBytes
           = Encoder $   uncurry mappend
                       . (   encode avroLong . fromIntegral . BS.length
                         &&& byteString
                         )
+        avroString = encodeUtf8 >$< avroBytes
 
 
 

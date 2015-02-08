@@ -14,7 +14,7 @@ import Data.Attoparsec.ByteString.Lazy (Parser, Result(Done, Fail), parse)
 import Data.ByteString.Builder (toLazyByteString)
 import Data.ByteString.Lazy (ByteString)
 
-import GHC.Exts (fromString)
+import GHC.Exts (IsString, fromString)
 
 import Test.SmallCheck.Series (Series, generate)
 
@@ -31,6 +31,7 @@ import Avro.Schema
       , avroLong
       , avroFloat
       , avroDouble
+      , avroBytes
       , avroString
       )
   , encode
@@ -98,8 +99,11 @@ avroPrimitiveTests = testGroup "Avro primitives"
 
   , testProperty "Double: decode . encode == id" (roundTrip avroDouble)
 
+  , testProperty "Bytes: decode . encode == id"
+      ( over longerStrings $ roundTrip avroBytes )
+
   , testProperty "String: decode . encode == id"
-      ( over longerStrings $ roundTrip avroString . fromString )
+      ( over weirderStrings $ roundTrip avroString )
   ]
 
 
@@ -119,8 +123,14 @@ allInt8s :: Monad m => Series m Int8
 allInt8s = generate $ const [minBound..maxBound]
 
 
-longerStrings :: Monad m => Series m String
-longerStrings = generate $ flip replicateM "\0a"
+strings :: (IsString s, Monad m) => [Char] -> Series m s
+strings cs = generate $ map fromString . flip replicateM cs
+
+longerStrings :: (IsString s, Monad m) => Series m s
+longerStrings = strings ['a', 'b']
+
+weirderStrings :: (IsString s, Monad m) => Series m s
+weirderStrings = strings ['\0', '語']
 
 
 largeAndSmall :: (Bounded a, Integral a, Monad m) => Series m a
