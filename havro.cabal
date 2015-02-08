@@ -21,6 +21,7 @@ library
   -- other-modules:
   -- other-extensions:
   build-depends: base == 4.7.*
+               , applicative-quoters == 0.1.*
                , attoparsec == 0.12.*
                , binary == 0.7.*
                , bytestring == 0.10.*

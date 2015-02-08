@@ -1,6 +1,8 @@
-{-# LANGUAGE FlexibleInstances
+{-# LANGUAGE BangPatterns
+           , FlexibleInstances
            , KindSignatures
            , OverloadedStrings
+           , QuasiQuotes
            , TupleSections
            , TypeSynonymInstances
   #-}
@@ -15,6 +17,8 @@ module Avro.Schema
       , avroLong
       , avroBytes
       , avroString
+
+      , avroArray
       )
 
   , Encoder (Encoder, encode)
@@ -22,6 +26,7 @@ module Avro.Schema
 where
 
 import Control.Applicative ((<$>))
+import Control.Applicative.QQ.Idiom (i)
 import Control.Arrow ((&&&))
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
@@ -29,8 +34,9 @@ import qualified Data.Attoparsec.ByteString.Lazy as APS
 import Data.Bool (bool)
 import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
+import Data.List (foldl', genericReplicate)
 
-import Data.Monoid ((<>), mappend)
+import Data.Monoid ((<>), mappend, mempty)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -63,6 +69,8 @@ class Schema (t :: * -> *)
         avroBytes :: t ByteString
         avroString :: t Text
 
+        avroArray :: t a -> t [a]
+
 
 -- |    Attoparsec parsers can parse according to an Avro schema.
 instance Schema APS.Parser
@@ -74,6 +82,13 @@ instance Schema APS.Parser
         avroDouble = runGet getFloat64le . LBS.fromStrict <$> APS.take 8
         avroBytes = APS.take . fromIntegral =<< avroLong
         avroString = either (fail . show) return . decodeUtf8' =<< avroBytes
+
+        avroArray itemSchema
+          = do  count <- avroLong
+                let arrayBlock = flip genericCount itemSchema . abs
+                if count /= 0
+                  then  [i| arrayBlock count ++ avroArray itemSchema |]
+                  else  return []
 
 
 -- |    Basically (-> Builder) if we had type-level operator sections.
@@ -98,6 +113,12 @@ instance Schema Encoder
                         )
         avroString = encodeUtf8 >$< avroBytes
 
+        avroArray itemSchema = Encoder $ \items
+         -> let encodeInc (!n, !b) x = (n + 1, b <> encode itemSchema x)
+                (count, itemData) = foldl' encodeInc (0, mempty) items
+            in  if count == 0
+                  then  word8 0
+                  else  encode avroLong count <> itemData <> word8 0
 
 
 encodeVarWord :: (FiniteBits a, Integral a) => a -> Builder
@@ -119,3 +140,7 @@ getVarWordBytes
       $ \s b -> if s
                   then  Just $ testBit b 7
                   else  Nothing
+
+
+genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
+genericCount n p = sequence (genericReplicate n p)

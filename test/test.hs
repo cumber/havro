@@ -6,6 +6,7 @@
            , RankNTypes
   #-}
 
+import Control.Applicative ((<*))
 import Control.Monad (replicateM)
 import Control.Monad.Logic (interleave)
 
@@ -13,7 +14,12 @@ import Data.Int (Int8, Int32, Int64)
 
 import Data.List (isInfixOf)
 
-import Data.Attoparsec.ByteString.Lazy (Parser, Result(Done, Fail), parse)
+import Data.Attoparsec.ByteString.Lazy
+  ( Parser
+  , Result(Done, Fail)
+  , parse
+  , endOfInput
+  )
 import Data.ByteString.Builder (toLazyByteString)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as BS
@@ -37,6 +43,8 @@ import Avro.Schema
       , avroDouble
       , avroBytes
       , avroString
+
+      , avroArray
       )
   , encode
   )
@@ -50,6 +58,7 @@ tests :: TestTree
 tests = testGroup "Tests"
   [ zigZagTests
   , avroPrimitiveTests
+  , avroCompoundTests
   ]
 
 
@@ -118,6 +127,12 @@ avroPrimitiveTests = testGroup "Avro primitives"
   ]
 
 
+avroCompoundTests :: TestTree
+avroCompoundTests = testGroup "Avro compound types"
+  [ testProperty "Array: decode . encode == id" (roundTrip (avroArray avroBool))
+  ]
+
+
 roundTrip :: Eq a => (forall s. Schema s => s a) -> a -> Bool
 roundTrip s x = parses x s . toLazyByteString . encode s $ x
 
@@ -133,7 +148,7 @@ parses :: Eq a => a -> Parser a -> ByteString -> Bool
 parses x parser
   = \case   Fail {} -> False
             Done _ r -> x == r
-    . parse parser
+    . parse (parser <* endOfInput)
 
 
 -- Generator ignores depth and just fully explores Int8
