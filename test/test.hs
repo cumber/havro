@@ -2,6 +2,7 @@
            , LambdaCase
            , MultiParamTypeClasses
            , NegativeLiterals
+           , OverloadedStrings
            , RankNTypes
   #-}
 
@@ -10,9 +11,12 @@ import Control.Monad.Logic (interleave)
 
 import Data.Int (Int8, Int32, Int64)
 
+import Data.List (isInfixOf)
+
 import Data.Attoparsec.ByteString.Lazy (Parser, Result(Done, Fail), parse)
 import Data.ByteString.Builder (toLazyByteString)
 import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString as BS
 
 import GHC.Exts (IsString, fromString)
 
@@ -104,11 +108,25 @@ avroPrimitiveTests = testGroup "Avro primitives"
 
   , testProperty "String: decode . encode == id"
       ( over weirderStrings $ roundTrip avroString )
+
+  , testProperty "Invalid UTF-8 fails decoding"
+      ( over invalidUtf8
+          $ fails avroString "Invalid UTF-8"
+              . toLazyByteString
+              . encode avroBytes
+      )
   ]
 
 
 roundTrip :: Eq a => (forall s. Schema s => s a) -> a -> Bool
 roundTrip s x = parses x s . toLazyByteString . encode s $ x
+
+
+fails :: Parser a -> String -> ByteString -> Bool
+fails parser message
+  = \case   Fail _ _ e -> message `isInfixOf` e
+            Done {} -> False
+    . parse parser
 
 
 parses :: Eq a => a -> Parser a -> ByteString -> Bool
@@ -131,6 +149,18 @@ longerStrings = strings ['a', 'b']
 
 weirderStrings :: (IsString s, Monad m) => Series m s
 weirderStrings = strings ['\0', '語']
+
+invalidUtf8 :: Monad m => Series m BS.ByteString
+invalidUtf8 = generate $ flip take cs
+  where cs =  [ "\x80"
+              , "\xbf"
+              , "A\x80"
+              , "\xc0 "
+              , "valid until \xc1 "
+              , "\xe0  "
+              , "\xc0\xaf"
+              , "\xfc\x80\x80\x80\x80\xaf"
+              ]
 
 
 largeAndSmall :: (Bounded a, Integral a, Monad m) => Series m a
