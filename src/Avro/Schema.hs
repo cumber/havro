@@ -25,9 +25,9 @@ module Avro.Schema
   )
 where
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), liftA2, Applicative(pure, (<*>)))
 import Control.Applicative.QQ.Idiom (i)
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), first, second)
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
@@ -47,6 +47,7 @@ import Data.Binary.Get (runGet)
 import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
+import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
 
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
@@ -144,3 +145,36 @@ getVarWordBytes
 
 genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
 genericCount n p = sequence (genericReplicate n p)
+
+
+
+instance Divisible Encoder
+  where conquer = Encoder $ const mempty
+        divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
+
+
+
+class AnyVariant f
+  where avmap :: (a -> b, b -> a) -> f a -> f b
+
+
+instance AnyVariant Encoder
+  where avmap = contramap . snd
+
+
+instance AnyVariant APS.Parser
+  where avmap = fmap . fst
+
+
+class AppliVisible f
+  where puree :: a -> f a
+        mush :: ((a, b) -> c, c -> (a, b)) -> f a -> f b -> f c
+
+
+instance AppliVisible Encoder
+  where puree = const conquer
+        mush = divide . snd
+
+instance AppliVisible APS.Parser
+  where puree = pure
+        mush = liftA2 . curry . fst
