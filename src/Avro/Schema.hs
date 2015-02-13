@@ -47,7 +47,7 @@ import Data.Binary.Get (runGet)
 import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
-import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
+import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer), divided)
 
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
@@ -178,3 +178,10 @@ instance AppliVisible Encoder
 instance AppliVisible APS.Parser
   where puree = pure
         mush = liftA2 . curry . fst
+
+
+(|$|) :: Contravariant f => (b -> a) -> f a -> f b
+(|$|) = contramap
+
+(|*|) :: Divisible f => f a -> f b -> f (a, b)
+(|*|) = divided
