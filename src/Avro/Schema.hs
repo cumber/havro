@@ -1,10 +1,13 @@
 {-# LANGUAGE BangPatterns
            , FlexibleInstances
+           , FlexibleContexts
+           , FunctionalDependencies
            , KindSignatures
+           , MultiParamTypeClasses
            , OverloadedStrings
            , QuasiQuotes
            , TupleSections
-           , TypeSynonymInstances
+           , UndecidableInstances
   #-}
 
 module Avro.Schema
@@ -153,35 +156,36 @@ instance Divisible Encoder
         divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
 
 
-
-class AnyVariant f
-  where avmap :: (a -> b, b -> a) -> f a -> f b
-
-
-instance AnyVariant Encoder
-  where avmap = contramap . snd
+(.:) :: (a -> b) -> (c -> d -> a) -> (c -> d -> b)
+(.:) = fmap . fmap
 
 
-instance AnyVariant APS.Parser
-  where avmap = fmap . fst
+data Pair a b = Pair a b deriving (Eq, Show)
+
+unPair (Pair a b) = (a, b)
 
 
-class AppliVisible f
-  where puree :: a -> f a
-        mush :: ((a, b) -> c, c -> (a, b)) -> f a -> f b -> f c
+data Triple a b c = Triple a b c deriving (Eq, Show)
+
+unTriple (Triple x y z) = (x, (y, (z, ())))
 
 
-instance AppliVisible Encoder
-  where puree = const conquer
-        mush = divide . snd
-
-instance AppliVisible APS.Parser
-  where puree = pure
-        mush = liftA2 . curry . fst
+class Divisible f => DivisibleApply f t z r | f t z -> r
+  where dApply :: (f (a, t) -> f z) -> f a -> r
 
 
-(|$|) :: Contravariant f => (b -> a) -> f a -> f b
-(|$|) = contramap
+instance Divisible f => DivisibleApply f () z (f z)
+  where dApply = (. flip divided conquer)
 
-(|*|) :: Divisible f => f a -> f b -> f (a, b)
-(|*|) = divided
+
+instance DivisibleApply f b z r' => DivisibleApply f (a, b) z (f (a, b) -> f z)
+  where dApply = (.: divided)
+
+
+(|*|) :: (Divisible f, DivisibleApply f t z r) => (f (a, t) -> f z) -> f a -> r
+(|*|) = dApply
+infixl 4 |*|
+
+(|$|) :: Divisible f => (z -> (a, b)) -> f a -> f b -> f z
+(|$|) = divide
+infixl 4 |$|
