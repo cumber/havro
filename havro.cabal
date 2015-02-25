@@ -17,6 +17,7 @@ cabal-version: >=1.10
 
 library
   exposed-modules: Avro.Schema
+                 , Data.Functor.PolyVariant
                  , ZigZagCoding
   -- other-modules:
   -- other-extensions:

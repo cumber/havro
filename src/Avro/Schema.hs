@@ -1,13 +1,9 @@
 {-# LANGUAGE BangPatterns
            , FlexibleInstances
-           , FlexibleContexts
-           , FunctionalDependencies
            , KindSignatures
-           , MultiParamTypeClasses
            , OverloadedStrings
            , QuasiQuotes
            , TupleSections
-           , UndecidableInstances
   #-}
 
 module Avro.Schema
@@ -28,7 +24,7 @@ module Avro.Schema
   )
 where
 
-import Control.Applicative ((<$>), liftA2, Applicative(pure, (<*>)))
+import Control.Applicative ((<$>))
 import Control.Applicative.QQ.Idiom (i)
 import Control.Arrow ((&&&), first, second)
 
@@ -50,7 +46,7 @@ import Data.Binary.Get (runGet)
 import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
-import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer), divided)
+import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
 
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
@@ -156,10 +152,6 @@ instance Divisible Encoder
         divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
 
 
-(.:) :: (a -> b) -> (c -> d -> a) -> (c -> d -> b)
-(.:) = fmap . fmap
-
-
 data Pair a b = Pair a b deriving (Eq, Show)
 
 unPair (Pair a b) = (a, b)
@@ -168,24 +160,3 @@ unPair (Pair a b) = (a, b)
 data Triple a b c = Triple a b c deriving (Eq, Show)
 
 unTriple (Triple x y z) = (x, (y, (z, ())))
-
-
-class Divisible f => DivisibleApply f t z r | f t z -> r
-  where dApply :: (f (a, t) -> f z) -> f a -> r
-
-
-instance Divisible f => DivisibleApply f () z (f z)
-  where dApply = (. flip divided conquer)
-
-
-instance DivisibleApply f b z r' => DivisibleApply f (a, b) z (f (a, b) -> f z)
-  where dApply = (.: divided)
-
-
-(|*|) :: (Divisible f, DivisibleApply f t z r) => (f (a, t) -> f z) -> f a -> r
-(|*|) = dApply
-infixl 4 |*|
-
-(|$|) :: Divisible f => (z -> (a, b)) -> f a -> f b -> f z
-(|$|) = divide
-infixl 4 |$|
