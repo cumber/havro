@@ -9,8 +9,6 @@
 module Data.Functor.PolyVariant
   ( DivisibleApply(dApply)
 
-  , PolyVariant(pvApply)
-
   , (|$|)
   , (|*|)
   )
@@ -18,7 +16,8 @@ where
 
 import Control.Applicative ((<$>), (<*>), Applicative)
 import Data.Functor.Contravariant.Divisible
-  ( Divisible(divide, conquer)
+  ( Divisible(divide)
+  , conquered
   , divided
   )
 
@@ -27,36 +26,23 @@ result :: (b -> c) -> (a -> b) -> (a -> c)
 result = fmap
 
 
-class Divisible f => DivisibleApply f t z r | f t z -> r, r t -> f, r t -> z
-  where dApply :: (f (a, t) -> f z) -> f a -> r
+class DivisibleApply as
+  where type DResult (f :: * -> *) as z
+        dApply :: Divisible f => (f (a, as) -> f z) -> f a -> DResult f as z
+
+instance DivisibleApply ()
+  where type DResult f () z = f z
+        dApply = (. flip divided conquered)
+
+instance DivisibleApply (a, as)
+  where type DResult f (a, as) z = f (a, as) -> f z
+        dApply = flip (result . result) divided
 
 
-instance Divisible f => DivisibleApply f () z (f z)
-  where dApply = (. flip divided conquer)
-
-
-instance DivisibleApply f b z r' => DivisibleApply f (a, b) z (f (a, b) -> f z)
-  where dApply = flip (result.result) divided
-
-
-type family Forwards f
-  where Forwards (z -> ()) = z
-        Forwards (z -> (a, b)) = a -> Forwards (z -> b)
-
-
-class PolyVariantMap f t z r
-  where pvMap :: (Forwards (z -> (a, t)), z -> (a, t)) -> f a -> r
-
-
-
-class PolyVariantMap f t z a => PolyVariant f t z a b r | a b r -> f, a b r -> t, a b r -> z
-  where pvApply :: a -> b -> r
-
-
-(|*|) :: PolyVariant f t z a b r => a -> b -> r
-(|*|) = pvApply
-infixl 4 |*|
-
-(|$|) :: PolyVariantMap f t z r => (Forwards (z -> (a, t)), z -> (a, t)) -> f a -> r
-(|$|) = pvMap
+(|$|) :: (Divisible f, DivisibleApply as) => (z -> (a, as)) -> f a -> f as -> f z
+(|$|) = divide
 infixl 4 |$|
+
+(|*|) :: (Divisible f, DivisibleApply as) => (f (a, as) -> f z) -> f a -> DResult f as z
+(|*|) = dApply
+infixl 4 |*|
