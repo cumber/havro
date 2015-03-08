@@ -4,7 +4,6 @@
            , FlexibleInstances
            , GADTs
            , FunctionalDependencies
-           , LambdaCase
            , MultiParamTypeClasses
            , TypeFamilies
            , TypeOperators
@@ -16,6 +15,14 @@ module Data.Functor.PolyVariant
 
   , (|$|)
   , (|*|)
+
+  , VarianceOf
+  , Polyvariant(pMap, pApplyIntermediate, pApplyFinal)
+  , PolyvariantApply(pApply)
+  , Reversible(Reversible, forwards, backwards)
+
+  , (/$/)
+  , (/*/)
   )
 where
 
