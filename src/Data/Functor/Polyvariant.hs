@@ -10,7 +10,7 @@
            , UndecidableInstances
   #-}
 
-module Data.Functor.PolyVariant
+module Data.Functor.Polyvariant
   ( DivisibleApply(dApply)
 
   , (|$|)
