@@ -1,4 +1,5 @@
-{-# LANGUAGE DataKinds
+{-# LANGUAGE ConstraintKinds
+           , DataKinds
            , FlexibleContexts
            , FlexibleInstances
            , GADTs
@@ -25,6 +26,8 @@ import Data.Functor.Contravariant.Divisible
   , divided
   )
 
+import GHC.Exts (Constraint)
+
 
 result :: (b -> c) -> (a -> b) -> (a -> c)
 result = fmap
@@ -50,33 +53,6 @@ infixl 4 |$|
 (|*|) :: (Divisible f, DivisibleApply as) => (f (a, as) -> f z) -> f a -> DResult f as z
 (|*|) = dApply
 infixl 4 |*|
-
-{-
-newtype CovariantF f as z
-  = CovariantF { runCovariantF :: Functionify (Map f as) (f z) }
-
-newtype ContravariantF f as z
-  = ContravariantF { runContravariantF :: f (Tuplify as) -> f z }
-
-
-
-{-
-data Reversible (as :: [*]) z
-  = Reversible
-      { forwards :: Functionify as z
-      , backwards :: z -> Tuplify as
-      }
--}
-
-
-data Reversible (as :: [*]) z
-  where Reversible
-         :: (forwards ~ Functionify as z, backwards ~ (z -> Tuplify as))
-         =>   { forwards :: forwards
-              , backwards :: backwards
-              }
-             -> Reversible as z
--}
 
 
 class Function f (as :: [*]) z | f as -> z, as z -> f
@@ -117,25 +93,59 @@ data Reversible (as :: [*]) z
 
 newtype ContravariantF f as z = ContravariantF { runContravariantF :: f (Tuplify as) -> f z }
 
-
-class PolyVariant (as :: [*])
-  where type PResult (f :: * -> *) (as :: [*]) z
-        pApply :: Divisible f => ContravariantF f (a ': as) z -> f a -> PResult f as z
+newtype CovariantF f as z = CovariantF { runCovariantF :: f (Functionify as z) }
 
 
-instance PolyVariant '[]
+data Variance = Covariance | Contravariance
+  deriving (Eq, Ord, Show)
+
+type family VarianceOf (f :: * -> *) :: Variance
+
+
+class Polyvariant (v :: Variance)
+  where type PolyvariantF v :: (* -> *) -> [*] -> * -> *
+        type PolyvariantConstraint v :: (* -> *) -> Constraint
+
+        pMap :: (v ~ VarianceOf f, PolyvariantConstraint v f) => Reversible (a ': as) z -> f a -> PolyvariantF v f as z
+        pApplyIntermediate :: (v ~ VarianceOf f, PolyvariantConstraint v f) => PolyvariantF v f (a ': b ': as) z -> f a -> PolyvariantF v f (b ': as) z
+        pApplyFinal :: (v ~ VarianceOf f, PolyvariantConstraint v f) => PolyvariantF v f '[a] z -> f a -> f z
+
+
+instance Polyvariant Covariance
+  where type PolyvariantF Covariance = CovariantF
+        type PolyvariantConstraint Covariance = Applicative
+
+        pMap (Reversible f _) = CovariantF . (f <$>)
+        pApplyIntermediate = result CovariantF . (<*>) . runCovariantF
+        pApplyFinal = (<*>) . runCovariantF
+
+instance Polyvariant Contravariance
+  where type PolyvariantF Contravariance = ContravariantF
+        type PolyvariantConstraint Contravariance = Divisible
+
+        pMap (Reversible _ b) = ContravariantF . divide b
+        pApplyIntermediate = result ContravariantF . (|*|) . runContravariantF
+        pApplyFinal = (|*|) . runContravariantF
+
+
+class PolyvariantApply (as :: [*])
+  where type PResult (f :: * -> *) as z
+        pApply :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f) => PolyvariantF (VarianceOf f) f (a ': as) z -> f a -> PResult f as z
+
+instance PolyvariantApply '[]
   where type PResult f '[] z = f z
-        pApply = (. flip divided conquered) . runContravariantF
+        pApply = pApplyFinal
 
-instance PolyVariant (a ': as)
-  where type PResult f (a ': as) z = ContravariantF f (a ': as) z
-        pApply = result ContravariantF . flip (result . result) divided . runContravariantF
+instance PolyvariantApply (a ': as)
+  where type PResult f (a ': as) z = PolyvariantF (VarianceOf f) f (a ': as) z
+        pApply = pApplyIntermediate
 
 
-(/$/) :: (Divisible f, PolyVariant as) => Reversible (a ': as) z -> f a -> ContravariantF f as z
-(/$/) = result ContravariantF . divide . \case Reversible _ backwards -> backwards
+(/$/) :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f) => Reversible (a ': as) z -> f a -> PolyvariantF (VarianceOf f) f as z
+(/$/) = pMap
 infixl 4 /$/
 
-(/*/) :: (Divisible f, PolyVariant as) => ContravariantF f (a ': as) z -> f a -> PResult f as z
+
+(/*/) :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f, PolyvariantApply as) => PolyvariantF (VarianceOf f) f (a ': as) z -> f a -> PResult f as z
 (/*/) = pApply
 infixl 4 /*/
