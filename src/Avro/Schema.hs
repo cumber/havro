@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns
+           , DataKinds
            , FlexibleInstances
            , KindSignatures
            , OverloadedStrings
            , QuasiQuotes
            , TupleSections
+           , TypeFamilies
   #-}
 
 module Avro.Schema
@@ -52,6 +54,11 @@ import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
+
+import Data.Functor.Polyvariant
+  ( VarianceOf
+  , Variance(Covariance, Contravariance)
+  )
 
 
 {-| Class of type constructors that can be used to interpret Avro schemas.
@@ -152,11 +159,5 @@ instance Divisible Encoder
         divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
 
 
-data Pair a b = Pair a b deriving (Eq, Show)
-
-unPair (Pair a b) = (a, b)
-
-
-data Triple a b c = Triple a b c deriving (Eq, Show)
-
-unTriple (Triple x y z) = (x, (y, (z, ())))
+type instance VarianceOf Encoder = Contravariance
+type instance VarianceOf APS.Parser = Covariance
