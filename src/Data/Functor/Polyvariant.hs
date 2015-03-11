@@ -1,13 +1,9 @@
 {-# LANGUAGE ConstraintKinds
            , DataKinds
            , FlexibleContexts
-           , FlexibleInstances
            , GADTs
-           , FunctionalDependencies
-           , MultiParamTypeClasses
            , TypeFamilies
            , TypeOperators
-           , UndecidableInstances
   #-}
 
 module Data.Functor.Polyvariant
@@ -23,15 +19,16 @@ module Data.Functor.Polyvariant
   , Variance(Covariance, Contravariance)
   , VarianceOf
 
-  , Tuple
-  , Tuplify
   , Function
-  , Functionify
+  , Arguments
+  , Result
+  , Tuple
+  , List
 
   , CovariantF (runCovariantF)
   , ContravariantF (runContravariantF)
 
-  , Reversible(Reversible)
+  , (<~>)((:/))
 
   , Polyvariant
       ( PolyvariantConstraint
@@ -97,47 +94,48 @@ infixl 4 /@/
 infixl 4 <@>
 
 
-class Function f (as :: [*]) z | f as -> z, as z -> f
+type family Function (as :: [*]) z
+  where Function '[] z = z
+        Function (a ': as) z = a -> Function as z
 
-instance Function z '[] z
-instance Function b as z => Function (a -> b) (a ': as) z
+type family Arguments f z :: [*]
+  where Arguments z z = '[]
+        Arguments (a -> b) z = a ': Arguments b z
+
+type family Result f (as :: [*])
+  where Result z '[] = z
+        Result (a -> b) (a ': as) = Result b as
+
+type family Tuple (as :: [*])
+  where Tuple '[] = ()
+        Tuple (a ': as) = (a, Tuple as)
+
+type family List t :: [*]
+  where List () = '[]
+        List (a, t) = a ': List t
+
+data (as :: [*]) <~> z
+  where (:/)
+         ::   ( f ~ Function as z
+              , as ~ Arguments f z
+              , z ~ Result f as
+              , t ~ Tuple as
+              , as ~ List t
+              )
+         => f -> (z -> t) -> as <~> z
+
+forwards :: as <~> z -> Function as z
+forwards (f :/ _) = f
+
+backwards :: as <~> z -> (z -> Tuple as)
+backwards (_ :/ b) = b
 
 
-class Tuple t (as :: [*]) | t -> as, as -> t
+newtype ContravariantF f (as :: [*]) z
+  = ContravariantF { runContravariantF :: f (Tuple as) -> f z }
 
-instance Tuple () '[]
-instance Tuple t as => Tuple (a, t) (a ': as)
-
-type family Tuplify (as :: [*])
-
-type instance Tuplify '[] = ()
-type instance Tuplify (a ': as) = (a, Tuplify as)
-
-type family Map f (as :: [*])
-  where Map f '[] = '[]
-        Map f (a ': as) = (f a ': Map f as)
-
-type family Functionify (as :: [*]) z
-
-type instance Functionify '[] z = z
-type instance Functionify (a ': as) z = a -> Functionify as z
-
-
-data Reversible (as :: [*]) z
-  where Reversible
-         :: (Function f as z, Tuple t as, Functionify as z ~ f, Tuplify as ~ t)
-         => f -> (z -> t) -> Reversible as z
-
-forwards :: Reversible as z -> Functionify as z
-forwards (Reversible f _) = f
-
-backwards :: Reversible as z -> (z -> Tuplify as)
-backwards (Reversible _ b) = b
-
-
-newtype ContravariantF f as z = ContravariantF { runContravariantF :: f (Tuplify as) -> f z }
-
-newtype CovariantF f as z = CovariantF { runCovariantF :: f (Functionify as z) }
+newtype CovariantF f (as :: [*]) z
+  = CovariantF { runCovariantF :: f (Function as z) }
 
 
 data Variance = Covariance | Contravariance
@@ -152,7 +150,7 @@ class Polyvariant (v :: Variance)
 
         pMap
          :: (v ~ VarianceOf f, PolyvariantConstraint v f)
-         => Reversible (a ': as) z -> f a -> PolyvariantF v f as z
+         => (a ': as) <~> z -> f a -> PolyvariantF v f as z
 
         pApplyIntermediate
          :: (v ~ VarianceOf f, PolyvariantConstraint v f)
@@ -185,7 +183,7 @@ instance Polyvariant Contravariance
 
 (|$|)
  :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f)
- => Reversible (a ': as) z -> f a -> PolyvariantF (VarianceOf f) f as z
+ => (a ': as) <~> z -> f a -> PolyvariantF (VarianceOf f) f as z
 (|$|) = pMap
 infixl 4 |$|
 
