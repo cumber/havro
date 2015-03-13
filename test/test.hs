@@ -1,9 +1,11 @@
-{-# LANGUAGE FlexibleInstances
+{-# LANGUAGE ConstraintKinds
+           , FlexibleContexts
            , LambdaCase
            , MultiParamTypeClasses
            , NegativeLiterals
            , OverloadedStrings
            , RankNTypes
+           , TypeFamilies
   #-}
 
 import Control.Applicative ((<*))
@@ -32,6 +34,14 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
+
+import Data.Functor.Polyvariant
+  ( (|$|)
+  , (|*|)
+  , (|@|)
+  , Polyvariant(VarianceOf)
+  , (<~>)((:/))
+  )
 
 import Avro.Schema
   ( Schema
@@ -130,12 +140,16 @@ avroPrimitiveTests = testGroup "Avro primitives"
 avroCompoundTests :: TestTree
 avroCompoundTests = testGroup "Avro compound types"
   [ testProperty "Array: decode . encode == id" (roundTrip (avroArray avroBool))
+
+  , testProperty "Triple can be round-tripped" (roundTripPolyvariant (avroBoolIntFloat))
   ]
 
 
 roundTrip :: Eq a => (forall s. Schema s => s a) -> a -> Bool
 roundTrip s x = parses x s . toLazyByteString . encode s $ x
 
+roundTripPolyvariant :: Eq a => (forall s. (Schema s, Polyvariant s) => s a) -> a -> Bool
+roundTripPolyvariant s x = parses x s . toLazyByteString . encode s $ x
 
 fails :: Parser a -> String -> ByteString -> Bool
 fails parser message
@@ -188,3 +202,15 @@ largeAndSmall
         xs = interleave
                 (interleave [mn, mn + 1 .. l] [mx, mx - 1 .. h])
                 (interleave [0, -1 .. l + 1] [1 .. h - 1])
+
+
+data Triple a b c = Triple a b c
+  deriving (Eq, Show)
+
+unTriple :: Triple a b c -> (a, (b, (c, ())))
+unTriple (Triple x y z) = (x, (y, (z, ())))
+
+avroBoolIntFloat
+ :: (Polyvariant f, Schema f)
+ => f (Triple Bool Int32 Float)
+avroBoolIntFloat = Triple :/ unTriple |$| avroBool |*| avroInt |@| avroFloat

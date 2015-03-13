@@ -56,7 +56,7 @@ import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
 import Data.Functor.Polyvariant
-  ( VarianceOf
+  ( Polyvariant(VarianceOf)
   , Variance(Covariance, Contravariance)
   )
 
@@ -159,5 +159,8 @@ instance Divisible Encoder
         divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
 
 
-type instance VarianceOf Encoder = Contravariance
-type instance VarianceOf APS.Parser = Covariance
+instance Polyvariant Encoder
+  where type VarianceOf Encoder = Contravariance
+
+instance Polyvariant APS.Parser
+  where type VarianceOf APS.Parser = Covariance

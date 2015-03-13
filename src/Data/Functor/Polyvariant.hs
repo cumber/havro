@@ -4,6 +4,7 @@
            , GADTs
            , TypeFamilies
            , TypeOperators
+           , UndecidableInstances
   #-}
 
 module Data.Functor.Polyvariant
@@ -17,7 +18,6 @@ module Data.Functor.Polyvariant
   , (<@>)
 
   , Variance(Covariance, Contravariance)
-  , VarianceOf
 
   , Function
   , Arguments
@@ -30,8 +30,9 @@ module Data.Functor.Polyvariant
 
   , (<~>)((:/))
 
-  , Polyvariant
-      ( PolyvariantConstraint
+  , Polyvariant(VarianceOf)
+  , VarianceMapApply
+      ( VarianceConstraint
       , PolyvariantF
       , pMap
       , pApplyIntermediate
@@ -141,40 +142,43 @@ newtype CovariantF f (as :: [*]) z
 data Variance = Covariance | Contravariance
   deriving (Eq, Ord, Show)
 
-type family VarianceOf (f :: * -> *) :: Variance
+
+class   (VarianceMapApply (VarianceOf f), VarianceConstraint (VarianceOf f) f)
+ => Polyvariant (f :: * -> *)
+  where type family VarianceOf (f :: * -> *) :: Variance
 
 
-class Polyvariant (v :: Variance)
+class VarianceMapApply (v :: Variance)
   where type PolyvariantF v :: (* -> *) -> [*] -> * -> *
-        type PolyvariantConstraint v :: (* -> *) -> Constraint
+        type VarianceConstraint v :: (* -> *) -> Constraint
 
         pMap
-         :: (v ~ VarianceOf f, PolyvariantConstraint v f)
+         :: (v ~ VarianceOf f, VarianceConstraint v f)
          => (a ': as) <~> z -> f a -> PolyvariantF v f as z
 
         pApplyIntermediate
-         :: (v ~ VarianceOf f, PolyvariantConstraint v f)
+         :: (v ~ VarianceOf f, VarianceConstraint v f)
          =>     PolyvariantF v f (a ': b ': as) z
              -> f a
              -> PolyvariantF v f (b ': as) z
 
         pApplyFinal
-          :: (v ~ VarianceOf f, PolyvariantConstraint v f)
+          :: (v ~ VarianceOf f, VarianceConstraint v f)
           => PolyvariantF v f '[a] z -> f a -> f z
 
 
-instance Polyvariant Covariance
+instance VarianceMapApply Covariance
   where type PolyvariantF Covariance = CovariantF
-        type PolyvariantConstraint Covariance = Applicative
+        type VarianceConstraint Covariance = Applicative
 
         pMap = result CovariantF . fmap . forwards
         pApplyIntermediate = result CovariantF . (<*>) . runCovariantF
         pApplyFinal = (<@>) . runCovariantF
 
 
-instance Polyvariant Contravariance
+instance VarianceMapApply Contravariance
   where type PolyvariantF Contravariance = ContravariantF
-        type PolyvariantConstraint Contravariance = Divisible
+        type VarianceConstraint Contravariance = Divisible
 
         pMap = result ContravariantF . divide . backwards
         pApplyIntermediate = result ContravariantF . (/*/) . runContravariantF
@@ -182,22 +186,20 @@ instance Polyvariant Contravariance
 
 
 (|$|)
- :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f)
+ :: Polyvariant f
  => (a ': as) <~> z -> f a -> PolyvariantF (VarianceOf f) f as z
 (|$|) = pMap
 infixl 4 |$|
 
 
 (|*|)
- :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f)
+ :: Polyvariant f
  =>     PolyvariantF (VarianceOf f) f (a ': b ': as) z
      -> f a
      -> PolyvariantF (VarianceOf f) f (b ': as) z
 (|*|) = pApplyIntermediate
 infixl 4 |*|
 
-(|@|)
- :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f)
- => PolyvariantF (VarianceOf f) f '[a] z -> f a -> f z
+(|@|) :: Polyvariant f => PolyvariantF (VarianceOf f) f '[a] z -> f a -> f z
 (|@|) = pApplyFinal
 infixl 4 |@|

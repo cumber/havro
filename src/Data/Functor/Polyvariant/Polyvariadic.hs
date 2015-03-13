@@ -17,8 +17,8 @@ where
 import Data.Functor.Polyvariant
   ( dApplyIntermediate
   , dApplyFinal
-  , Polyvariant(PolyvariantConstraint, PolyvariantF, pApplyIntermediate, pApplyFinal)
-  , VarianceOf
+  , VarianceMapApply(PolyvariantF, pApplyIntermediate, pApplyFinal)
+  , Polyvariant(VarianceOf)
   )
 
 import Data.Functor.Contravariant.Divisible
@@ -48,7 +48,7 @@ infixl 4 /*/
 
 class PolyvariantApply (as :: [*])
   where type PResult (f :: * -> *) as z
-        pApply :: (Polyvariant (VarianceOf f), PolyvariantConstraint (VarianceOf f) f) => PolyvariantF (VarianceOf f) f (a ': as) z -> f a -> PResult f as z
+        pApply :: Polyvariant f => PolyvariantF (VarianceOf f) f (a ': as) z -> f a -> PResult f as z
 
 instance PolyvariantApply '[]
   where type PResult f '[] z = f z
@@ -60,10 +60,7 @@ instance PolyvariantApply (a ': as)
 
 
 (|*|)
- ::   ( Polyvariant (VarianceOf f)
-      , PolyvariantConstraint (VarianceOf f) f
-      , PolyvariantApply as
-      )
+ :: (Polyvariant f , PolyvariantApply as)
  => PolyvariantF (VarianceOf f) f (a ': as) z -> f a -> PResult f as z
 (|*|) = pApply
 infixl 4 |*|
