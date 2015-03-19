@@ -28,7 +28,7 @@ import qualified Data.ByteString as BS
 
 import GHC.Exts (IsString, fromString)
 
-import Test.SmallCheck.Series (Series, generate)
+import Test.SmallCheck.Series (Series, generate, cons3)
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
@@ -39,7 +39,7 @@ import Data.Functor.Polyvariant
   ( (|$|)
   , (|*|)
   , (|@|)
-  , Polyvariant(VarianceOf)
+  , Polyvariant
   , (<~>)((:/))
   )
 
@@ -141,14 +141,20 @@ avroCompoundTests :: TestTree
 avroCompoundTests = testGroup "Avro compound types"
   [ testProperty "Array: decode . encode == id" (roundTrip (avroArray avroBool))
 
-  , testProperty "Triple can be round-tripped" (roundTripPolyvariant (avroBoolIntFloat))
+  , testProperty "Triple can be round-tripped"
+      ( over (cons3 Triple)
+          $ ( roundTripPolyvariant avroBoolNullFloat
+              :: Triple Bool () Float -> Bool
+            )
+      )
   ]
 
 
 roundTrip :: Eq a => (forall s. Schema s => s a) -> a -> Bool
 roundTrip s x = parses x s . toLazyByteString . encode s $ x
 
-roundTripPolyvariant :: Eq a => (forall s. (Schema s, Polyvariant s) => s a) -> a -> Bool
+roundTripPolyvariant
+ :: Eq a => (forall s. (Schema s, Polyvariant s) => s a) -> a -> Bool
 roundTripPolyvariant s x = parses x s . toLazyByteString . encode s $ x
 
 fails :: Parser a -> String -> ByteString -> Bool
@@ -207,10 +213,14 @@ largeAndSmall
 data Triple a b c = Triple a b c
   deriving (Eq, Show)
 
+--instance Monad m => Serial m Int32
+--  where series = generate $ \d -> [negate (fromIntegral d) .. fromIntegral d]
+
+
 unTriple :: Triple a b c -> (a, (b, (c, ())))
 unTriple (Triple x y z) = (x, (y, (z, ())))
 
-avroBoolIntFloat
+avroBoolNullFloat
  :: (Polyvariant f, Schema f)
- => f (Triple Bool Int32 Float)
-avroBoolIntFloat = Triple :/ unTriple |$| avroBool |*| avroInt |@| avroFloat
+ => f (Triple Bool () Float)
+avroBoolNullFloat = Triple :/ unTriple |$| avroBool |*| avroNull |@| avroFloat
