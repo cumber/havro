@@ -26,8 +26,7 @@ module Avro.Schema
   )
 where
 
-import Control.Applicative ((<$>))
-import Control.Applicative.QQ.Idiom (i)
+import Control.Applicative ((<$>), (<*>))
 import Control.Arrow ((&&&), first, second)
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
@@ -94,7 +93,7 @@ instance Schema APS.Parser
           = do  count <- avroLong
                 let arrayBlock = flip genericCount itemSchema . abs
                 if count /= 0
-                  then  [i| arrayBlock count ++ avroArray itemSchema |]
+                  then  (++) <$> arrayBlock count <*> avroArray itemSchema
                   else  return []
 
 
