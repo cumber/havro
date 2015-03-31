@@ -26,7 +26,6 @@ module Avro.Schema
   )
 where
 
-import Control.Applicative ((<$>), (<*>))
 import Control.Arrow ((&&&), first, second)
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
@@ -36,7 +35,7 @@ import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
 import Data.List (foldl', genericReplicate)
 
-import Data.Monoid ((<>), mappend, mempty)
+import Data.Monoid ((<>))
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -159,7 +158,7 @@ instance Divisible Encoder
 
 
 instance Polyvariant Encoder
-  where type VarianceOf Encoder = Contravariance
+  where type VarianceOf Encoder = 'Contravariance
 
 instance Polyvariant APS.Parser
-  where type VarianceOf APS.Parser = Covariance
+  where type VarianceOf APS.Parser = 'Covariance

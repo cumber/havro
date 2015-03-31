@@ -8,7 +8,6 @@
            , TypeFamilies
   #-}
 
-import Control.Applicative ((<*))
 import Control.Monad (replicateM)
 import Control.Monad.Logic (interleave)
 

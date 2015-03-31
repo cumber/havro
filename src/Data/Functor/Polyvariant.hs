@@ -45,8 +45,6 @@ module Data.Functor.Polyvariant
   )
 where
 
-import Control.Applicative ((<$>), Applicative((<*>)))
-
 import Data.Functor.Contravariant.Divisible
   ( Divisible(divide)
   , conquered
@@ -166,18 +164,18 @@ class VarianceMapApply (v :: Variance)
           => PolyvariantF v f '[a] z -> f a -> f z
 
 
-instance VarianceMapApply Covariance
-  where type PolyvariantF Covariance = CovariantF
-        type VarianceConstraint Covariance = Applicative
+instance VarianceMapApply 'Covariance
+  where type PolyvariantF 'Covariance = CovariantF
+        type VarianceConstraint 'Covariance = Applicative
 
         pMap = result CovariantF . (<$>) . forwards
         pApplyIntermediate = result CovariantF . (<*>) . runCovariantF
         pApplyFinal = (<@>) . runCovariantF
 
 
-instance VarianceMapApply Contravariance
-  where type PolyvariantF Contravariance = ContravariantF
-        type VarianceConstraint Contravariance = Divisible
+instance VarianceMapApply 'Contravariance
+  where type PolyvariantF 'Contravariance = ContravariantF
+        type VarianceConstraint 'Contravariance = Divisible
 
         pMap = result ContravariantF . (/$/) . backwards
         pApplyIntermediate = result ContravariantF . (/*/) . runContravariantF

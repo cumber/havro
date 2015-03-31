@@ -14,7 +14,7 @@ where
 
 import Data.Bits ((.&.), FiniteBits, finiteBitSize, shiftL, shiftR, xor)
 import Data.Int (Int8, Int16, Int32, Int64)
-import Data.Word (Word, Word8, Word16, Word32, Word64)
+import Data.Word (Word8, Word16, Word32, Word64)
 
 
 -- |    Relates signed and unsigned integer types of the same bit-width.
