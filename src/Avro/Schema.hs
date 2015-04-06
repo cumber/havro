@@ -102,6 +102,20 @@ newtype Encoder t = Encoder { encode :: t -> Builder }
 instance Contravariant Encoder
   where contramap f = Encoder . ( . f) . encode
 
+instance Divisible Encoder
+  where conquer = Encoder $ const mempty
+        divide f n m
+          = Encoder $   uncurry mappend
+                      . first (encode n)
+                      . second (encode m)
+                      . f
+
+instance Polyvariant Encoder
+  where type VarianceOf Encoder = 'Contravariance
+
+instance Polyvariant APS.Parser
+  where type VarianceOf APS.Parser = 'Covariance
+
 
 -- |    An 'Encoder' serialises Haskell values according to an Avro schema.
 instance Schema Encoder
@@ -149,16 +163,3 @@ getVarWordBytes
 
 genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
 genericCount n p = sequence (genericReplicate n p)
-
-
-
-instance Divisible Encoder
-  where conquer = Encoder $ const mempty
-        divide f n m = Encoder $ uncurry mappend . first (encode n) . second (encode m) . f
-
-
-instance Polyvariant Encoder
-  where type VarianceOf Encoder = 'Contravariance
-
-instance Polyvariant APS.Parser
-  where type VarianceOf APS.Parser = 'Covariance
