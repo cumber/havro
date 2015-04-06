@@ -212,9 +212,6 @@ largeAndSmall
 data Triple a b c = Triple a b c
   deriving (Eq, Show)
 
---instance Monad m => Serial m Int32
---  where series = generate $ \d -> [negate (fromIntegral d) .. fromIntegral d]
-
 
 unTriple :: Triple a b c -> (a, (b, (c, ())))
 unTriple (Triple x y z) = (x, (y, (z, ())))
