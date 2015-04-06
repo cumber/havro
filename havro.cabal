@@ -31,7 +31,7 @@ library
                , text == 1.2.*
   hs-source-dirs: src
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -fwarn-missing-exported-sigs
 
 test-suite test
   type: exitcode-stdio-1.0
@@ -49,4 +49,4 @@ test-suite test
                , tasty-smallcheck == 0.8.*
   hs-source-dirs: test
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -fwarn-missing-exported-sigs
