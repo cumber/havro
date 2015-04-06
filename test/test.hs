@@ -1,15 +1,20 @@
 {-# LANGUAGE ConstraintKinds
            , FlexibleContexts
+           , GADTs
            , LambdaCase
            , MultiParamTypeClasses
            , NegativeLiterals
            , OverloadedStrings
            , RankNTypes
+           , StandaloneDeriving
            , TypeFamilies
   #-}
 
 import Control.Monad (replicateM)
 import Control.Monad.Logic (interleave)
+
+import Data.Functor.Contravariant (Contravariant(contramap))
+import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
 
 import Data.Int (Int8, Int32, Int64)
 
@@ -35,7 +40,10 @@ import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
 import Data.Functor.Polyvariant
-  ( (|$|)
+  ( (/$/)
+  , (/*/)
+  , (/@/)
+  , (|$|)
   , (|*|)
   , (|@|)
   , Polyvariant
@@ -66,6 +74,7 @@ main = defaultMain tests
 tests :: TestTree
 tests = testGroup "Tests"
   [ zigZagTests
+  , polyvariantTests
   , avroPrimitiveTests
   , avroCompoundTests
   ]
@@ -99,6 +108,41 @@ zigZagTests = testGroup "Zig zag coding"
   , testProperty "negatives encode to odd"
       ( over allInt8s $ \x -> x < 0 ==> odd (zigZagEncode x) )
   ]
+
+
+polyvariantTests :: TestTree
+polyvariantTests = testGroup "Polyvariant"
+  [ testProperty "foo" foo'
+  ]
+
+foo :: (Divisible f, Eq (f z)) => (z -> (a, as)) -> f a -> f as -> Bool
+foo = undefined
+
+newtype Z = Z { unZ :: (A, As) }
+  deriving (Eq, Show)
+
+newtype A = A Int
+  deriving (Eq, Show)
+
+newtype As = As Int
+  deriving (Eq, Show)
+
+data F z
+  where DZConquer :: F t
+        DZDivide :: (z -> (a, as)) -> F a -> F as -> F z
+        FA :: F A
+        FAs :: F As
+
+
+instance Contravariant F
+instance Divisible F
+  where divide = DZDivide
+
+foo' :: Bool
+foo' = (unZ /$/ FA) FAs `same` divide unZ FA FAs
+  where same :: F t -> F t -> Bool
+        same DZConquer DZConquer = True
+        same (DZDivide _ _ _) (DZDivide _ _ _) = True
 
 
 avroPrimitiveTests :: TestTree
