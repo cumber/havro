@@ -1,11 +1,13 @@
 {-# LANGUAGE BangPatterns
            , DataKinds
            , FlexibleInstances
+           , GADTs
            , KindSignatures
            , OverloadedStrings
            , QuasiQuotes
            , TupleSections
            , TypeFamilies
+           , TypeOperators
   #-}
 
 module Avro.Schema
@@ -26,7 +28,7 @@ module Avro.Schema
   )
 where
 
-import Control.Arrow ((&&&), first, second)
+import Control.Arrow ((&&&), (***))
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
@@ -34,6 +36,11 @@ import Data.Bool (bool)
 import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
 import Data.List (foldl', genericReplicate)
+
+import Data.HList (HList)
+
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import Data.Monoid ((<>))
 
@@ -61,20 +68,24 @@ import Data.Functor.Polyvariant
 
 {-| Class of type constructors that can be used to interpret Avro schemas.
 
-    Given a @schema :: 'Schema' t => t a@, @a@ is a Haskell type corresponding
+    Given a @schema :: 'Schema' s => s a@, @a@ is a Haskell type corresponding
     to the Avro type described by @schema@.
 -}
-class Schema (t :: * -> *)
-  where avroNull :: t ()
-        avroBool :: t Bool
-        avroInt :: t Int32
-        avroLong :: t Int64
-        avroFloat :: t Float
-        avroDouble :: t Double
-        avroBytes :: t ByteString
-        avroString :: t Text
+class Schema (s :: * -> *)
+  where avroNull :: s ()
+        avroBool :: s Bool
+        avroInt :: s Int32
+        avroLong :: s Int64
+        avroFloat :: s Float
+        avroDouble :: s Double
+        avroBytes :: s ByteString
+        avroString :: s Text
 
-        avroArray :: t a -> t [a]
+        avroArray :: s a -> s [a]
+
+        avroRecord
+         :: ByteString -> Maybe ByteString -> [ByteString] -> Fields s as
+            -> s (HList as)
 
 
 -- |    Attoparsec parsers can parse according to an Avro schema.
@@ -106,8 +117,7 @@ instance Divisible Encoder
   where conquer = Encoder $ const mempty
         divide f n m
           = Encoder $   uncurry mappend
-                      . first (encode n)
-                      . second (encode m)
+                      . (encode n *** encode m)
                       . f
 
 instance Polyvariant Encoder
@@ -163,3 +173,17 @@ getVarWordBytes
 
 genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
 genericCount n p = sequence (genericReplicate n p)
+
+
+data Field (s :: * -> *) a
+  = Field
+      { fieldName :: ByteString
+      , fieldType :: s a
+      , fieldDefault :: Maybe a
+      , fieldAttrs :: Map ByteString ByteString
+      }
+
+
+data Fields (s :: * -> *) (as :: [*])
+  where Stop :: Fields s '[]
+        Go :: Field s a -> Fields s as -> Fields s (a ': as)
