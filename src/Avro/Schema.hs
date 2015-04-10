@@ -37,7 +37,7 @@ import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
 import Data.List (foldl', genericReplicate)
 
-import Data.HList (HList)
+import Data.Vinyl (Record)
 
 import Data.Map (Map)
 import qualified Data.Map as Map
