@@ -29,6 +29,7 @@ library
                , containers == 0.5.*
                , contravariant >= 1.2 && < 1.4
                , data-binary-ieee754 == 0.4.*
+               , lens == 4.9.*
                , vinyl == 0.5.*
                , text == 1.2.*
   hs-source-dirs: src

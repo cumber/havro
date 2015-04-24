@@ -1,10 +1,14 @@
 {-# LANGUAGE BangPatterns
            , DataKinds
+           , FlexibleContexts
            , FlexibleInstances
+           , FunctionalDependencies
            , GADTs
            , KindSignatures
+           , MultiParamTypeClasses
            , OverloadedStrings
            , QuasiQuotes
+           , TemplateHaskell
            , TupleSections
            , TypeFamilies
            , TypeOperators
@@ -25,10 +29,48 @@ module Avro.Schema
       )
 
   , Encoder (Encoder, encode)
+
+  , FieldDesc
+      ( FieldDesc
+      , fieldName
+      , fieldDoc
+      , fieldDefaultValue
+      , fieldOrder
+      , fieldAliases
+      , fieldAttrs
+      )
+  , Order (Ascending, Descending, Ignore)
+  , Field (Field, fieldDesc, fieldSchema)
+  , RecordDesc
+      ( RecordDesc
+      , recordName
+      , recordDoc
+      , recordAliases
+      )
+  , field
+  , record
+  , name
+  , doc
+  , defaultValue
+  , order
+  , aliases
+  , attrs
+  , desc
+  , schema
+  , withDoc
+  , withDefault
+  , withOrder
+  , withAlias
+  , withAttr
+  , (|::)
+  , (|--)
   )
 where
 
 import Control.Arrow ((&&&), (***))
+
+import Control.Lens ((&), (.~), (%~))
+import Control.Lens.TH (makeLensesWith, abbreviatedFields)
 
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
@@ -37,26 +79,27 @@ import Data.Bits ((.&.), FiniteBits, setBit, shiftL, shiftR, testBit)
 import Data.Int (Int32, Int64)
 import Data.List (foldl', genericReplicate)
 
-import Data.Vinyl (Record)
-
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Data.Monoid ((<>))
+import Data.Binary.Get (runGet)
+import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Builder (Builder, byteString, doubleLE, floatLE, word8)
 
-import Data.Binary.Get (runGet)
-import Data.Binary.IEEE754 (getFloat32le, getFloat64le)
+import Data.Monoid ((<>))
 
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
 import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
 
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
+
+import Data.Vinyl (Rec((:&), RNil), HList, rmap, rtraverse)
+import Data.Vinyl.Functor (Identity(Identity))
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
@@ -83,9 +126,7 @@ class Schema (s :: * -> *)
 
         avroArray :: s a -> s [a]
 
-        avroRecord
-         :: ByteString -> Maybe ByteString -> [ByteString] -> Fields s as
-            -> s (HList as)
+        avroRecord :: RecordDesc -> Rec (Field s) as -> s (HList as)
 
 
 -- |    Attoparsec parsers can parse according to an Avro schema.
@@ -105,6 +146,8 @@ instance Schema APS.Parser
                 if count /= 0
                   then  (++) <$> arrayBlock count <*> avroArray itemSchema
                   else  return []
+
+        avroRecord _ = rtraverse (fmap Identity . fieldSchema)
 
 
 -- |    Basically (-> Builder) if we had type-level operator sections.
@@ -149,6 +192,8 @@ instance Schema Encoder
                   then  word8 0
                   else  encode avroLong count <> itemData <> word8 0
 
+        avroRecord _ = z . rmap fieldSchema
+
 
 encodeVarWord :: (FiniteBits a, Integral a) => a -> Builder
 encodeVarWord x
@@ -175,15 +220,89 @@ genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
 genericCount n p = sequence (genericReplicate n p)
 
 
-data Field (s :: * -> *) a
-  = Field
+z :: Rec Encoder as -> Encoder (HList as)
+z (e :& es) = Encoder $ \(Identity x :& xs) -> encode e x <> encode (z es) xs
+z RNil = Encoder $ const ""
+
+
+data FieldDesc a
+  = FieldDesc
       { fieldName :: ByteString
-      , fieldType :: s a
-      , fieldDefault :: Maybe a
+      , fieldDoc :: Maybe ByteString
+      , fieldDefaultValue :: Maybe a
+      , fieldOrder :: Order
+      , fieldAliases :: [ByteString]
       , fieldAttrs :: Map ByteString ByteString
+      }
+  deriving  (Eq, Show)
+
+
+data Order = Ascending | Descending | Ignore
+  deriving  (Eq, Show)
+
+
+data Field s a
+  = Field
+      { fieldDesc :: FieldDesc a
+      , fieldSchema :: s a
       }
 
 
-data Fields (s :: * -> *) (as :: [*])
-  where Stop :: Fields s '[]
-        Go :: Field s a -> Fields s as -> Fields s (a ': as)
+field :: ByteString -> FieldDesc a
+field name
+  = FieldDesc
+      { fieldName = name
+      , fieldDoc = Nothing
+      , fieldDefaultValue = Nothing
+      , fieldOrder = Ascending
+      , fieldAliases = []
+      , fieldAttrs = Map.empty
+      }
+
+data RecordDesc
+  = RecordDesc
+      { recordName :: ByteString
+      , recordDoc :: Maybe ByteString
+      , recordAliases :: [ByteString]
+      }
+  deriving  (Eq, Show)
+
+
+record :: ByteString -> RecordDesc
+record name
+  = RecordDesc
+      { recordName = name
+      , recordDoc = Nothing
+      , recordAliases = []
+      }
+
+
+(|::) :: Schema s => FieldDesc a -> s a -> Rec (Field s) '[a]
+desc |:: sa = Field desc sa :& RNil
+infixr 6 |::
+
+
+(|--) :: Schema s => RecordDesc -> Rec (Field s) as -> s (HList as)
+desc |-- fields = avroRecord desc fields
+infixl 1 |--
+
+
+$(makeLensesWith abbreviatedFields ''FieldDesc)
+$(makeLensesWith abbreviatedFields ''Field)
+$(makeLensesWith abbreviatedFields ''RecordDesc)
+
+
+withDoc :: HasDoc r ByteString => r -> ByteString -> r
+f `withDoc` d = f & doc .~ d
+
+withDefault :: HasDefaultValue r (Maybe a) => r -> a -> r
+f `withDefault` d = f & defaultValue .~ Just d
+
+withOrder :: HasOrder r Order => r -> Order -> r
+f `withOrder` o = f & order .~ o
+
+withAlias :: HasAliases r [a] => r -> a -> r
+f `withAlias` a = f & aliases %~ (a:)
+
+withAttr :: HasAttrs r (Map ByteString ByteString) => r -> (ByteString, ByteString) -> r
+f `withAttr` (k, v) = f & attrs %~ Map.insert k v
