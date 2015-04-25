@@ -37,7 +37,6 @@ module Avro.Schema
       , fieldDefaultValue
       , fieldOrder
       , fieldAliases
-      , fieldAttrs
       )
   , Order (Ascending, Descending, Ignore)
   , Field (Field, fieldDesc, fieldSchema)
@@ -54,14 +53,12 @@ module Avro.Schema
   , defaultValue
   , order
   , aliases
-  , attrs
   , desc
   , schema
   , withDoc
   , withDefault
   , withOrder
   , withAlias
-  , withAttr
   , (|::)
   , (|--)
   )
@@ -254,7 +251,6 @@ data FieldDesc a
       , fieldDefaultValue :: Maybe a
       , fieldOrder :: Order
       , fieldAliases :: [ByteString]
-      , fieldAttrs :: Map ByteString ByteString
       }
   deriving  (Eq, Show)
 
@@ -278,7 +274,6 @@ field name
       , fieldDefaultValue = Nothing
       , fieldOrder = Ascending
       , fieldAliases = []
-      , fieldAttrs = Map.empty
       }
 
 data RecordDesc
@@ -325,6 +320,3 @@ f `withOrder` o = f & order .~ o
 
 withAlias :: HasAliases r [a] => r -> a -> r
 f `withAlias` a = f & aliases %~ (a:)
-
-withAttr :: HasAttrs r (Map ByteString ByteString) => r -> (ByteString, ByteString) -> r
-f `withAttr` (k, v) = f & attrs %~ Map.insert k v
