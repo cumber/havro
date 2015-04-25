@@ -64,6 +64,8 @@ module Avro.Schema
   )
 where
 
+import Control.Applicative (liftA2)
+
 import Control.Arrow ((&&&), (***))
 
 import Control.Lens ((&), (.~), (%~))
@@ -90,7 +92,10 @@ import Data.ByteString.Builder (Builder, byteString, doubleLE, floatLE, word8)
 import Data.Monoid ((<>))
 
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
-import Data.Functor.Contravariant.Divisible (Divisible(divide, conquer))
+import Data.Functor.Contravariant.Divisible
+  ( Divisible(divide, conquer)
+  , divided
+  )
 
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
@@ -129,6 +134,7 @@ class Schema (s :: * -> *)
         avroEnum :: Enum a => s a
 
         avroArray :: s a -> s [a]
+        avroMap :: s a -> s (Map Text a)
         avroFixed :: Int32 -> s ByteString
 
 
@@ -153,6 +159,12 @@ instance Schema APS.Parser
                 if count /= 0
                   then  (++) <$> arrayBlock count <*> avroArray itemSchema
                   else  return []
+
+        avroMap
+          =     fmap Map.fromList
+              . avroArray
+              . uncurry (liftA2 (,))
+              . (avroString,)
 
         avroFixed = APS.take . fromIntegral
 
@@ -202,6 +214,9 @@ instance Schema Encoder
             in  if count == 0
                   then  word8 0
                   else  encode avroLong count <> itemData <> word8 0
+
+        avroMap
+          = contramap Map.toList . avroArray . divided avroString
 
         avroFixed n
           = Encoder
