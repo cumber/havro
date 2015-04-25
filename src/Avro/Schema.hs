@@ -125,6 +125,12 @@ class Schema (s :: * -> *)
         avroString :: s Text
 
         avroRecord :: RecordDesc -> Rec (Field s) as -> s (HList as)
+
+        -- NOTE: this type is not safe, since the data file may contain an index
+        -- that doesn't correspond to any element, and the result when parsing is
+        -- an exception rather than a parse failure.
+        avroEnum :: Enum a => s a
+
         avroArray :: s a -> s [a]
         avroFixed :: Int32 -> s ByteString
 
@@ -141,6 +147,8 @@ instance Schema APS.Parser
         avroString = either (fail . show) return . decodeUtf8' =<< avroBytes
 
         avroRecord _ = rtraverse (fmap Identity . fieldSchema)
+
+        avroEnum = toEnum . fromIntegral <$> avroInt
 
         avroArray itemSchema
           = do  count <- avroLong
@@ -188,6 +196,8 @@ instance Schema Encoder
         avroString = encodeUtf8 >$< avroBytes
 
         avroRecord _ = recEncoder . rmap fieldSchema
+
+        avroEnum = fromIntegral . fromEnum >$< avroInt
 
         avroArray itemSchema = Encoder $ \items
          -> let encodeInc (!n, !b) x = (n + 1, b <> encode itemSchema x)
