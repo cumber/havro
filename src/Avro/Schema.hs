@@ -124,9 +124,9 @@ class Schema (s :: * -> *)
         avroBytes :: s ByteString
         avroString :: s Text
 
-        avroArray :: s a -> s [a]
-
         avroRecord :: RecordDesc -> Rec (Field s) as -> s (HList as)
+        avroArray :: s a -> s [a]
+        avroFixed :: Int32 -> s ByteString
 
 
 -- |    Attoparsec parsers can parse according to an Avro schema.
@@ -140,6 +140,8 @@ instance Schema APS.Parser
         avroBytes = APS.take . fromIntegral =<< avroLong
         avroString = either (fail . show) return . decodeUtf8' =<< avroBytes
 
+        avroRecord _ = rtraverse (fmap Identity . fieldSchema)
+
         avroArray itemSchema
           = do  count <- avroLong
                 let arrayBlock = flip genericCount itemSchema . abs
@@ -147,7 +149,7 @@ instance Schema APS.Parser
                   then  (++) <$> arrayBlock count <*> avroArray itemSchema
                   else  return []
 
-        avroRecord _ = rtraverse (fmap Identity . fieldSchema)
+        avroFixed = APS.take . fromIntegral
 
 
 -- |    Basically (-> Builder) if we had type-level operator sections.
@@ -185,6 +187,8 @@ instance Schema Encoder
                         )
         avroString = encodeUtf8 >$< avroBytes
 
+        avroRecord _ = recEncoder . rmap fieldSchema
+
         avroArray itemSchema = Encoder $ \items
          -> let encodeInc (!n, !b) x = (n + 1, b <> encode itemSchema x)
                 (count, itemData) = foldl' encodeInc (0, mempty) items
@@ -192,7 +196,14 @@ instance Schema Encoder
                   then  word8 0
                   else  encode avroLong count <> itemData <> word8 0
 
-        avroRecord _ = z . rmap fieldSchema
+        avroFixed n
+          = Encoder
+              $ byteString
+                  . \bs ->  let l = BS.length bs
+                                n' = fromIntegral n
+                            in  if  l == n'
+                                  then  bs
+                                  else  bs <> BS.replicate (n' - l) 0x0
 
 
 encodeVarWord :: (FiniteBits a, Integral a) => a -> Builder
@@ -220,9 +231,10 @@ genericCount :: (Monad m, Integral i) => i -> m a -> m [a]
 genericCount n p = sequence (genericReplicate n p)
 
 
-z :: Rec Encoder as -> Encoder (HList as)
-z (e :& es) = Encoder $ \(Identity x :& xs) -> encode e x <> encode (z es) xs
-z RNil = Encoder $ const ""
+recEncoder :: Rec Encoder as -> Encoder (HList as)
+recEncoder RNil = Encoder $ const ""
+recEncoder (e :& es)
+  = Encoder $ \(Identity x :& xs) -> encode e x <> encode (recEncoder es) xs
 
 
 data FieldDesc a
