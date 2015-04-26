@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns
            , DataKinds
+           , ExplicitNamespaces
            , FlexibleContexts
            , FlexibleInstances
            , FunctionalDependencies
@@ -102,6 +103,7 @@ import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 
 import Data.Vinyl (Rec((:&), RNil), HList, rmap, rtraverse)
 import Data.Vinyl.Functor (Identity(Identity))
+import Data.Vinyl.Notation (type (∈), type (⊆))
 
 import ZigZagCoding (zigZagEncode, zigZagDecode)
 
@@ -135,6 +137,7 @@ class Schema (s :: * -> *)
 
         avroArray :: s a -> s [a]
         avroMap :: s a -> s (Map Text a)
+        avroUnion :: Rec s as -> s (Union as)
         avroFixed :: Int32 -> s ByteString
 
 
@@ -165,6 +168,15 @@ instance Schema APS.Parser
               . avroArray
               . uncurry (liftA2 (,))
               . (avroString,)
+
+        avroUnion ts
+          = select ts =<< avroLong
+          where --select :: Rec APS.Parser as -> Int64 -> (forall a. (a ∈ as) => APS.Parser a)
+                select :: (as' ⊆ as) => Rec APS.Parser as' -> Int64 -> APS.Parser (Union as)
+                select RNil _ = fail "Union index too high"
+                select (s :& ss) x
+                  | x <= 0     = Some <$> s
+                  | otherwise = select ss (x - 1)
 
         avroFixed = APS.take . fromIntegral
 
@@ -257,6 +269,10 @@ recEncoder :: Rec Encoder as -> Encoder (HList as)
 recEncoder RNil = Encoder $ const ""
 recEncoder (e :& es)
   = Encoder $ \(Identity x :& xs) -> encode e x <> encode (recEncoder es) xs
+
+
+data Union (as :: [*])
+  where Some :: (a ∈ as) => a -> Union as
 
 
 data FieldDesc a
