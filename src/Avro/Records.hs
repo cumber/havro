@@ -1,17 +1,9 @@
-{-# LANGUAGE BangPatterns
-           , DataKinds
-           , FlexibleContexts
+{-# LANGUAGE FlexibleContexts
            , FlexibleInstances
            , FunctionalDependencies
-           , GADTs
-           , KindSignatures
            , MultiParamTypeClasses
-           , OverloadedStrings
            , QuasiQuotes
            , TemplateHaskell
-           , TupleSections
-           , TypeFamilies
-           , TypeOperators
   #-}
 
 module Avro.Records

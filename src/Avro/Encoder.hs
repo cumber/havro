@@ -1,17 +1,7 @@
 {-# LANGUAGE BangPatterns
            , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , GADTs
-           , KindSignatures
-           , MultiParamTypeClasses
            , OverloadedStrings
-           , QuasiQuotes
-           , TemplateHaskell
-           , TupleSections
            , TypeFamilies
-           , TypeOperators
   #-}
 
 module Avro.Encoder

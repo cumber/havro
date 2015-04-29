@@ -1,18 +1,7 @@
-{-# LANGUAGE BangPatterns
-           , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
+{-# LANGUAGE DataKinds
            , GeneralizedNewtypeDeriving
-           , GADTs
-           , KindSignatures
-           , MultiParamTypeClasses
-           , OverloadedStrings
-           , QuasiQuotes
-           , TemplateHaskell
            , TupleSections
            , TypeFamilies
-           , TypeOperators
   #-}
 
 module Avro.Parser

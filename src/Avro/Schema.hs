@@ -1,17 +1,5 @@
-{-# LANGUAGE BangPatterns
-           , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , GADTs
+{-# LANGUAGE DataKinds
            , KindSignatures
-           , MultiParamTypeClasses
-           , OverloadedStrings
-           , QuasiQuotes
-           , TemplateHaskell
-           , TupleSections
-           , TypeFamilies
-           , TypeOperators
   #-}
 
 module Avro.Schema
