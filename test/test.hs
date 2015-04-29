@@ -15,12 +15,8 @@ import Data.Int (Int8, Int32, Int64)
 
 import Data.List (isInfixOf)
 
-import Data.Attoparsec.ByteString.Lazy
-  ( Parser
-  , Result(Done, Fail)
-  , parse
-  , endOfInput
-  )
+import qualified Data.Attoparsec.ByteString.Lazy as APS
+
 import Data.ByteString.Builder (toLazyByteString)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as BS
@@ -55,9 +51,9 @@ import Avro.Schema
 
       , avroArray
       )
-  , encode
   )
-
+import Avro.Encoder (encode)
+import Avro.Parser (Parser(Parser), parse)
 
 main :: IO ()
 main = defaultMain tests
@@ -158,16 +154,16 @@ roundTripPolyvariant s x = parses x s . toLazyByteString . encode s $ x
 
 fails :: Parser a -> String -> ByteString -> Bool
 fails parser message
-  = \case   Fail _ _ e -> message `isInfixOf` e
-            Done {} -> False
+  = \case   APS.Fail _ _ e  -> message `isInfixOf` e
+            APS.Done {}     -> False
     . parse parser
 
 
 parses :: Eq a => a -> Parser a -> ByteString -> Bool
 parses x parser
-  = \case   Fail {} -> False
-            Done _ r -> x == r
-    . parse (parser <* endOfInput)
+  = \case   APS.Fail {}     -> False
+            APS.Done _ r    -> x == r
+    . parse (parser <* Parser APS.endOfInput)
 
 
 -- Generator ignores depth and just fully explores Int8

@@ -16,7 +16,10 @@ build-type: Simple
 cabal-version: >=1.10
 
 library
-  exposed-modules: Avro.Schema
+  exposed-modules: Avro.Encoder
+                 , Avro.Parser
+                 , Avro.Records
+                 , Avro.Schema
                  , Data.Functor.Polyvariant
                  , Data.Functor.Polyvariant.Polyvariadic
                  , ZigZagCoding
