@@ -17,6 +17,7 @@ cabal-version: >=1.10
 
 library
   exposed-modules: Avro.Encoder
+                 , Avro.Inspector
                  , Avro.Parser
                  , Avro.Records
                  , Avro.Schema
