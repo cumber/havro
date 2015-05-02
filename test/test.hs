@@ -15,6 +15,9 @@ import Data.Int (Int8, Int32, Int64)
 
 import Data.List (isInfixOf)
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+
 import qualified Data.Attoparsec.ByteString.Lazy as APS
 
 import Data.ByteString.Builder (toLazyByteString)
@@ -23,7 +26,15 @@ import qualified Data.ByteString as BS
 
 import GHC.Exts (IsString, fromString)
 
-import Test.SmallCheck.Series (Series, generate, cons3)
+import Test.SmallCheck.Series
+  ( (><)
+  , Series
+  , series
+  , getDepth
+  , localDepth
+  , generate
+  , cons3
+  )
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.SmallCheck ((==>), changeDepth, over, testProperty)
@@ -49,7 +60,11 @@ import Avro.Schema
       , avroBytes
       , avroString
 
+      , avroRecord
+      , avroEnum
       , avroArray
+      , avroMap
+      , avroFixed
       )
   )
 import Avro.Encoder (encode)
@@ -64,6 +79,7 @@ tests = testGroup "Tests"
   [ zigZagTests
   , avroPrimitiveTests
   , avroCompoundTests
+  , avroPolyvariantTests
   ]
 
 
@@ -135,8 +151,17 @@ avroPrimitiveTests = testGroup "Avro primitives"
 avroCompoundTests :: TestTree
 avroCompoundTests = testGroup "Avro compound types"
   [ testProperty "Array: decode . encode == id" (roundTrip (avroArray avroBool))
+  , testProperty "Map: decode . encode == id"
+      ( over (mapsOf longerStrings series) $ roundTrip (avroMap avroBool) )
+  , testProperty "Fixed: decode . encode == id"
+      ( changeDepth (*20) . \n ->   over (stringsOfLength n "\NUL\255")
+                  $ roundTrip (avroFixed (fromIntegral n))
+      )
+  ]
 
-  , testProperty "Triple can be round-tripped"
+avroPolyvariantTests :: TestTree
+avroPolyvariantTests = testGroup "Records via polyvariance"
+  [ testProperty "Triple can be round-tripped"
       ( over (cons3 Triple)
           $ ( roundTripPolyvariant avroBoolNullFloat
               :: Triple Bool () Float -> Bool
@@ -170,9 +195,12 @@ parses x parser
 allInt8s :: Monad m => Series m Int8
 allInt8s = generate $ const [minBound..maxBound]
 
-
+-- NOTE: this always generates strings of length 'depth'; revisit
 strings :: (IsString s, Monad m) => [Char] -> Series m s
 strings cs = generate $ map fromString . flip replicateM cs
+
+stringsOfLength :: (IsString s, Monad m) => Int -> [Char] -> Series m s
+stringsOfLength n cs = generate $ \d -> take d . map fromString $ replicateM n cs
 
 longerStrings :: (IsString s, Monad m) => Series m s
 longerStrings = strings ['a', 'b']
@@ -203,6 +231,19 @@ largeAndSmall
         xs = interleave
                 (interleave [mn, mn + 1 .. l] [mx, mx - 1 .. h])
                 (interleave [0, -1 .. l + 1] [1 .. h - 1])
+
+
+(.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
+(.:) = fmap . fmap
+infixr 9 .:
+
+
+mapsOf :: (Monad m, Ord k) => Series m k -> Series m v -> Series m (Map k v)
+mapsOf = (fmap Map.fromList . listsOf . localDepth (`div` 4)) .: (><)
+
+
+listsOf :: Monad m => Series m a -> Series m [a]
+listsOf = localDepth (`div` 2) . \s -> flip replicateM s =<< getDepth
 
 
 data Triple a b c = Triple a b c
