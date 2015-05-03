@@ -23,11 +23,11 @@ module Avro.Inspector
   )
 where
 
+import Data.ByteString (ByteString)
+
 import Data.Int (Int32, Int64)
 
 import Data.Map (Map)
-
-import Data.ByteString (ByteString)
 
 import Data.Text (Text)
 
@@ -73,7 +73,6 @@ data Inspector a
         AArray :: Inspector a -> Inspector [a]
         AMap :: Inspector a -> Inspector (Map Text a)
         AFixed :: Int32 -> Inspector ByteString
-
 
 
 instance Schema Inspector

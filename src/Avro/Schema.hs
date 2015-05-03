@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds
+           , GADTs
            , KindSignatures
   #-}
 
@@ -22,6 +23,8 @@ module Avro.Schema
 
   , (|::)
   , (|--)
+
+  , SomeSchema(SomeSchema)
   )
 where
 
@@ -77,3 +80,7 @@ infixr 6 |::
 (|--) :: Schema s => RecordDesc -> Rec (Field s) as -> s (HList as)
 desc |-- fields = avroRecord desc fields
 infixl 1 |--
+
+
+data SomeSchema s
+  where SomeSchema :: s a -> SomeSchema s

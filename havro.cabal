@@ -21,6 +21,7 @@ library
                  , Avro.Parser
                  , Avro.Records
                  , Avro.Schema
+                 , Avro.Schema.JSON
                  , Data.Functor.Polyvariant
                  , Data.Functor.Polyvariant.Polyvariadic
                  , VinylTypeLits
@@ -28,6 +29,7 @@ library
   -- other-modules:
   -- other-extensions:
   build-depends: base >= 4.7 && < 4.9
+               , aeson == 0.8.*
                , attoparsec == 0.12.*
                , binary == 0.7.*
                , bytestring == 0.10.*
