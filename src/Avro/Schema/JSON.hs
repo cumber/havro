@@ -1,3 +1,7 @@
+{-# LANGUAGE LambdaCase
+           , OverloadedStrings
+  #-}
+
 module Avro.Schema.JSON
   (
   )
@@ -8,6 +12,7 @@ import Control.Applicative (Alternative, (<|>), empty)
 import Data.Aeson
   ( FromJSON(parseJSON)
   , Value(Object, Array, String, Number, Bool, Null)
+  , Object
   , (.:)
   )
 import Data.Aeson.Types (Parser)
@@ -63,7 +68,22 @@ schemaFromJSON (String s)
         _           ->  empty
 
 schemaFromJSON (Object o)
-  =     schemaFromJSON . String =<< o .: "type"
-    <|> empty
+  =     (schemaFromJSON . String =<< o .: "type")
+    <|> (schemaFromJSONObject o =<< o .: "type")
 
 schemaFromJSON _ = empty
+
+
+schemaFromJSONObject :: Schema s => Object -> Text -> Parser (SomeSchema s)
+
+schemaFromJSONObject o "record" = (fmap . fmap) SomeSchema avroRecord <$> _ <*> _
+
+schemaFromJSONObject o "enum" = pure $ SomeSchema avroEnum
+
+schemaFromJSONObject o "array" = (\case SomeSchema s -> SomeSchema $ avroArray s) <$> (schemaFromJSON =<< o .: "item")
+
+schemaFromJSONObject o "map" = SomeSchema . avroMap <$> _
+
+schemaFromJSONObject o "fixed" = SomeSchema . avroFixed <$> _
+
+schemaFromJSONObject _ _ = empty
