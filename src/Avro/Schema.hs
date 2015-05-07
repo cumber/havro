@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds
            , GADTs
            , KindSignatures
+           , RankNTypes
   #-}
 
 module Avro.Schema
@@ -24,7 +25,8 @@ module Avro.Schema
   , (|::)
   , (|--)
 
-  , SomeSchema(SomeSchema)
+  , Some(Some)
+  , transform
   )
 where
 
@@ -82,5 +84,9 @@ desc |-- fields = avroRecord desc fields
 infixl 1 |--
 
 
-data SomeSchema s
-  where SomeSchema :: s a -> SomeSchema s
+data Some f
+  where Some :: f a -> Some f
+
+
+transform :: (forall a. f a -> g b) -> Some f -> Some g
+transform f (Some x) = Some (f x)

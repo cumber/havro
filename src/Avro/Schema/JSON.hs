@@ -49,23 +49,25 @@ import Avro.Schema
       , avroMap
       , avroFixed
       )
-  , SomeSchema(SomeSchema)
+  , Some(Some)
+  , transform
   )
 
 
-schemaFromJSON :: Schema s => Value -> Parser (SomeSchema s)
+schemaFromJSON :: Schema s => Value -> Parser (Some s)
 
 schemaFromJSON (String s)
   = case s of
-        "null"      ->  pure $ SomeSchema avroNull
-        "boolean"   ->  pure $ SomeSchema avroBool
-        "int"       ->  pure $ SomeSchema avroInt
-        "long"      ->  pure $ SomeSchema avroLong
-        "float"     ->  pure $ SomeSchema avroFloat
-        "double"    ->  pure $ SomeSchema avroDouble
-        "bytes"     ->  pure $ SomeSchema avroBytes
-        "string"    ->  pure $ SomeSchema avroString
+        "null"      ->  p avroNull
+        "boolean"   ->  p avroBool
+        "int"       ->  p avroInt
+        "long"      ->  p avroLong
+        "float"     ->  p avroFloat
+        "double"    ->  p avroDouble
+        "bytes"     ->  p avroBytes
+        "string"    ->  p avroString
         _           ->  empty
+  where p = pure . Some
 
 schemaFromJSON (Object o)
   =     (schemaFromJSON . String =<< o .: "type")
@@ -74,16 +76,20 @@ schemaFromJSON (Object o)
 schemaFromJSON _ = empty
 
 
-schemaFromJSONObject :: Schema s => Object -> Text -> Parser (SomeSchema s)
+schemaFromJSONObject :: Schema s => Object -> Text -> Parser (Some s)
 
-schemaFromJSONObject o "record" = (fmap . fmap) SomeSchema avroRecord <$> _ <*> _
+schemaFromJSONObject o "record" = parseSome $ avroRecord <$> _ <*> _
 
-schemaFromJSONObject o "enum" = pure $ SomeSchema avroEnum
+schemaFromJSONObject o "enum" = (pure . Some) avroEnum
 
-schemaFromJSONObject o "array" = (\case SomeSchema s -> SomeSchema $ avroArray s) <$> (schemaFromJSON =<< o .: "item")
+schemaFromJSONObject o "array" = transform avroArray <$> _ --(schemaFromJSON =<< o .: "item")
 
-schemaFromJSONObject o "map" = SomeSchema . avroMap <$> _
+schemaFromJSONObject o "map" = Some . avroMap <$> _
 
-schemaFromJSONObject o "fixed" = SomeSchema . avroFixed <$> _
+schemaFromJSONObject o "fixed" = Some . avroFixed <$> _
 
 schemaFromJSONObject _ _ = empty
+
+
+parseSome :: Parser (f a) -> Parser (Some f)
+parseSome = fmap Some
