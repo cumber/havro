@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds
            , GADTs
            , KindSignatures
+           , PolyKinds
            , RankNTypes
   #-}
 
@@ -24,9 +25,6 @@ module Avro.Schema
 
   , (|::)
   , (|--)
-
-  , Some(Some)
-  , transform
   )
 where
 
@@ -82,11 +80,3 @@ infixr 6 |::
 (|--) :: Schema s => RecordDesc -> Rec (Field s) as -> s (HList as)
 desc |-- fields = avroRecord desc fields
 infixl 1 |--
-
-
-data Some f
-  where Some :: f a -> Some f
-
-
-transform :: (forall a. f a -> g b) -> Some f -> Some g
-transform f (Some x) = Some (f x)

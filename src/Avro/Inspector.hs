@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds
            , GADTs
-           , KindSignatures
+           , StandaloneDeriving
   #-}
 
 module Avro.Inspector
@@ -20,6 +20,7 @@ module Avro.Inspector
       , AMap
       , AFixed
       )
+  , fromInspector
   )
 where
 
@@ -31,10 +32,10 @@ import Data.Map (Map)
 
 import Data.Text (Text)
 
-import Data.Vinyl (Rec, HList)
+import Data.Vinyl (Rec, HList, (<<$>>))
 
 import Avro.Records
-  ( Field
+  ( Field (fieldSchema)
   , RecordDesc
   )
 
@@ -74,6 +75,8 @@ data Inspector a
         AMap :: Inspector a -> Inspector (Map Text a)
         AFixed :: Int32 -> Inspector ByteString
 
+--deriving instance Show (Inspector a)
+
 
 instance Schema Inspector
   where avroNull = ANull
@@ -90,3 +93,22 @@ instance Schema Inspector
         avroArray = AArray
         avroMap = AMap
         avroFixed = AFixed
+
+
+fromInspector :: Schema s => Inspector a -> s a
+fromInspector ANull = avroNull
+fromInspector ABool = avroBool
+fromInspector AInt = avroInt
+fromInspector ALong = avroLong
+fromInspector AFloat = avroFloat
+fromInspector ADouble = avroDouble
+fromInspector ABytes = avroBytes
+fromInspector AString = avroString
+
+fromInspector (ARecord desc fields) = avroRecord desc (genField <<$>> fields)
+  where genField :: Schema s => Field Inspector a -> Field s a
+        genField f = f { fieldSchema = fromInspector . fieldSchema $ f }
+fromInspector AEnum = avroEnum
+fromInspector (AArray itemSchema) = avroArray . fromInspector $ itemSchema
+fromInspector (AMap valueSchema) = avroMap . fromInspector $ valueSchema
+fromInspector (AFixed size) = avroFixed size
