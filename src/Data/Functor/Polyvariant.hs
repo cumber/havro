@@ -5,6 +5,7 @@
            , TypeFamilies
            , TypeOperators
            , UndecidableInstances
+           , UndecidableSuperClasses
   #-}
 
 module Data.Functor.Polyvariant
@@ -28,7 +29,7 @@ module Data.Functor.Polyvariant
   , CovariantF (runCovariantF)
   , ContravariantF (runContravariantF)
 
-  , (<~>)((:/))
+  , type (<~>) ((:/))
 
   , Polyvariant(VarianceOf)
   , VarianceMapApply

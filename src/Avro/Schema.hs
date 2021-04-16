@@ -33,7 +33,7 @@ import Data.ByteString (ByteString)
 
 import Data.Text (Text)
 
-import Data.Vinyl (Rec((:&), RNil), HList)
+import Data.Vinyl (Rec((:&), RNil), HList, RMap)
 
 import Avro.Records
   ( FieldDesc
@@ -57,7 +57,7 @@ class Schema (s :: * -> *)
         avroBytes :: s ByteString
         avroString :: s Text
 
-        avroRecord :: RecordDesc -> Rec (Field s) as -> s (HList as)
+        avroRecord :: RMap as => RecordDesc -> Rec (Field s) as -> s (HList as)
 
         -- NOTE: this type is not safe, since the data file may contain an index
         -- that doesn't correspond to any element, and the result when parsing is
@@ -74,6 +74,6 @@ desc |:: sa = Field desc sa :& RNil
 infixr 6 |::
 
 
-(|--) :: Schema s => RecordDesc -> Rec (Field s) as -> s (HList as)
+(|--) :: (Schema s, RMap as) => RecordDesc -> Rec (Field s) as -> s (HList as)
 desc |-- fields = avroRecord desc fields
 infixl 1 |--

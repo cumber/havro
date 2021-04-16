@@ -46,7 +46,7 @@ import Data.Functor.Polyvariant
   , (|*|)
   , (|@|)
   , Polyvariant
-  , (<~>)((:/))
+  , type (<~>) ((:/))
   )
 
 import Avro.Schema
@@ -60,8 +60,8 @@ import Avro.Schema
       , avroBytes
       , avroString
 
-      , avroRecord
-      , avroEnum
+--      , avroRecord
+--      , avroEnum
       , avroArray
       , avroMap
       , avroFixed

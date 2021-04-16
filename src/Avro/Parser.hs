@@ -60,7 +60,7 @@ import Data.Functor.Polyvariant
 
 
 newtype Parser a = Parser { getAttoparsecParser :: APS.Parser a }
-  deriving (Functor, Applicative, Monad, Monoid)
+  deriving (Functor, Applicative, Monad, MonadFail, Semigroup, Monoid)
 
 parse :: Parser a -> LBS.ByteString -> APS.Result a
 parse = APS.parse . getAttoparsecParser

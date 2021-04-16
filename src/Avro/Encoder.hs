@@ -20,8 +20,6 @@ import qualified Data.Map as Map
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder, byteString, doubleLE, floatLE, word8)
 
-import Data.Monoid ((<>))
-
 import Data.Functor.Contravariant ((>$<), Contravariant(contramap))
 import Data.Functor.Contravariant.Divisible
   ( Divisible(divide, conquer)
